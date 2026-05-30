@@ -2,45 +2,30 @@
 @import "./styles/fitwork.css";
 
 @theme {
-  /* FitWork Design Tokens - Colors */
-  --color-primary: #0F6E56;
-  --color-accent: #1D9E75;
-  --color-warning: #BA7517;
-  --color-danger: #E24B4A;
-  --color-bg-light: #F8FAF9;
-  --color-bg-dark: #1A1F1E;
+  /* FitWork Brand Colors */
+  --color-primary:        #0F6E56;
+  --color-accent:         #1D9E75;
+  --color-warning:        #BA7517;
+  --color-danger:         #E24B4A;
+  --color-bg-light:       #F8FAF9;
+  --color-bg-dark:        #1A1F1E;
 
-  /* Surface & interaction state tokens */
-  --color-surface-dark: #222826;
-  --color-primary-hover: #0d5d49;
+  /* Surface & interaction tokens */
+  --color-surface-dark:   #222826;
+  --color-primary-hover:  #0d5d49;
   --color-primary-active: #0a4a3a;
   --color-elevation-dark: #2a3230;
-  --color-accent-hover: #179066;
+  --color-accent-hover:   #179066;
 
-  /* FitWork Design Tokens - Typography */
+  /* Typography */
   --font-display: "Sora", system-ui, sans-serif;
-  --font-body: "Inter", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-body:    "Inter", system-ui, sans-serif;
+  --font-mono:    "JetBrains Mono", ui-monospace, monospace;
 }
 
-@layer base {
-  body {
-    @apply font-body text-gray-700;
-  }
-
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6 {
-    @apply font-display font-semibold;
-  }
-
-  code,
-  pre {
-    @apply font-mono;
-  }
+/* ── Reset & Base ─────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
 }
 
 html {
@@ -52,60 +37,26 @@ html {
 
 body {
   margin: 0;
+  font-family: "Inter", system-ui, sans-serif;
 }
 
 #root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
   min-height: 100svh;
   display: flex;
   flex-direction: column;
-  box-sizing: border-box;
 }
 
-h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
+/* Remove default heading/paragraph overrides from old template */
+h1, h2, h3, h4, h5, h6 {
   margin: 0;
+  font-family: "Sora", system-ui, sans-serif;
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
-}
+p { margin: 0; }
 
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
-}
+/* ── Scrollbar styling ────────────────────────────────── */
+::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 3px; }
+
+.dark ::-webkit-scrollbar-thumb { background: #374151; }
