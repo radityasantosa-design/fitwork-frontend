@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./styles/fitwork.css";
 
 @theme {
   /* FitWork Design Tokens - Colors */
@@ -8,6 +9,13 @@
   --color-danger: #E24B4A;
   --color-bg-light: #F8FAF9;
   --color-bg-dark: #1A1F1E;
+
+  /* Surface & interaction state tokens */
+  --color-surface-dark: #222826;
+  --color-primary-hover: #0d5d49;
+  --color-primary-active: #0a4a3a;
+  --color-elevation-dark: #2a3230;
+  --color-accent-hover: #179066;
 
   /* FitWork Design Tokens - Typography */
   --font-display: "Sora", system-ui, sans-serif;

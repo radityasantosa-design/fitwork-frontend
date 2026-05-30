@@ -1,0 +1,104 @@
+﻿import { Activity, Brain, Clock, Coffee, Bell, Sparkles, Lightbulb } from "lucide-react";
+import { LineChart, Line, ResponsiveContainer } from "recharts";
+import { Card, GaugeRing, StatusPill, Avatar, Logo } from "./shared";
+
+const data = [
+  { v: 65 }, { v: 78 }, { v: 88 }, { v: 72 }, { v: 60 }, { v: 85 }, { v: 90 }, { v: 76 },
+];
+
+export function MobileDashboard({ onTriggerBreak }) {
+  return (
+    <div className="mx-auto bg-bg-light dark:bg-bg-dark overflow-hidden rounded-[40px] border border-neutral-200 dark:border-white/10 shadow-2xl" style={{ width: 390, minHeight: 780 }}>
+      <div className="flex items-center justify-between px-5 pt-3 pb-1" style={{ fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>
+        <span className="text-neutral-700 dark:text-neutral-200">9:41</span>
+        <div className="flex items-center gap-1 text-neutral-500">
+          <span>•••</span><span>5G</span><span>100%</span>
+        </div>
+      </div>
+
+      <header className="flex items-center justify-between px-5 py-3">
+        <Logo size={24} />
+        <div className="flex items-center gap-2">
+          <button className="relative w-9 h-9 rounded-xl hover:bg-neutral-100 dark:hover:bg-white/5 flex items-center justify-center text-neutral-600 dark:text-neutral-300 transition active:scale-95">
+            <Bell size={16} />
+            <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-danger" />
+          </button>
+          <Avatar />
+        </div>
+      </header>
+
+      <div className="px-5 space-y-4">
+        <div className="flex items-center gap-3">
+          <GaugeRing value={87} size={80} status="normal" />
+          <div>
+            <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 20, fontWeight: 600 }} className="text-neutral-900 dark:text-white">
+              Hi, Raditya
+            </h2>
+            <p className="text-neutral-500 mt-0.5" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
+              Focus today: <span className="text-primary dark:text-accent" style={{ fontWeight: 600 }}>87/100</span>
+            </p>
+            <StatusPill status="normal" label="Live session" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            { l: "Focus", v: "87", u: "/100", s: "normal", i: <Brain size={16} /> },
+            { l: "Stress", v: "42", u: "%", s: "warning", i: <Activity size={16} /> },
+            { l: "Active", v: "5h 24m", s: "normal", i: <Clock size={16} /> },
+            { l: "Breaks", v: "68", u: "%", s: "warning", i: <Coffee size={16} /> },
+          ].map((m) => (
+            <Card key={m.l} className="p-3.5 active:scale-[0.98] transition">
+              <div className="flex items-center justify-between">
+                <span style={{ fontSize: 12 }} className="text-neutral-500">{m.l}</span>
+                <span className={`w-7 h-7 rounded-lg flex items-center justify-center ${m.s === "warning" ? "bg-warning/10 text-warning" : "bg-accent/10 text-accent"}`}>{m.i}</span>
+              </div>
+              <div className="mt-1.5 flex items-baseline gap-1">
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 22, fontWeight: 600 }} className="text-neutral-900 dark:text-white">{m.v}</span>
+                {m.u && <span style={{ fontSize: 12 }} className="text-neutral-500">{m.u}</span>}
+              </div>
+            </Card>
+          ))}
+        </div>
+
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 14, fontWeight: 600 }} className="text-neutral-900 dark:text-white">Focus trend</h3>
+            <span className="text-neutral-500" style={{ fontSize: 11 }}>Last 8 hours</span>
+          </div>
+          <div className="h-20">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data}>
+                <Line type="monotone" dataKey="v" stroke="#0F6E56" strokeWidth={2.5} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+
+        <Card className="p-4 bg-linear-to-br from-accent/10 to-transparent border-accent/25">
+          <div className="flex items-start gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-accent/20 text-primary dark:text-accent flex items-center justify-center flex-shrink-0">
+              <Sparkles size={14} />
+            </div>
+            <div>
+              <div className="text-neutral-900 dark:text-white" style={{ fontSize: 13, fontWeight: 600 }}>AI Insight</div>
+              <p className="text-neutral-500 mt-0.5" style={{ fontSize: 12, lineHeight: 1.5 }}>
+                Stress index rose 18%. A 5-min stretch could reset your focus.
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        <button
+          onClick={onTriggerBreak}
+          className="w-full py-3 rounded-2xl bg-primary hover:bg-primary-hover active:bg-primary-active active:scale-[0.98] text-white transition-all flex items-center justify-center gap-2"
+          style={{ fontSize: 14, fontWeight: 600 }}
+        >
+          <Lightbulb size={16} /> Show break alert
+        </button>
+      </div>
+
+      <div className="mt-5 mx-auto w-32 h-1 rounded-full bg-neutral-300 dark:bg-white/20 mb-2" />
+    </div>
+  );
+}

@@ -1,0 +1,72 @@
+/* FitWork Design Token CSS - Direct variable definitions & utility classes */
+:root {
+  /* Core brand colors */
+  --color-primary:        #0F6E56;
+  --color-accent:         #1D9E75;
+  --color-warning:        #BA7517;
+  --color-danger:         #E24B4A;
+  --color-bg-light:       #F8FAF9;
+  --color-bg-dark:        #1A1F1E;
+
+  /* Surface & interaction states */
+  --color-surface-dark:   #222826;
+  --color-primary-hover:  #0d5d49;
+  --color-primary-active: #0a4a3a;
+  --color-elevation-dark: #2a3230;
+  --color-accent-hover:   #179066;
+}
+
+/* ── Text ────────────────────────────────────────── */
+.text-primary        { color: var(--color-primary); }
+.text-accent         { color: var(--color-accent); }
+.text-warning        { color: var(--color-warning); }
+.text-danger         { color: var(--color-danger); }
+
+/* ── Background ──────────────────────────────────── */
+.bg-primary          { background-color: var(--color-primary); }
+.bg-accent           { background-color: var(--color-accent); }
+.bg-warning          { background-color: var(--color-warning); }
+.bg-danger           { background-color: var(--color-danger); }
+.bg-bg-light         { background-color: var(--color-bg-light); }
+.bg-bg-dark          { background-color: var(--color-bg-dark); }
+.bg-surface-dark     { background-color: var(--color-surface-dark); }
+.bg-primary-hover    { background-color: var(--color-primary-hover); }
+.bg-primary-active   { background-color: var(--color-primary-active); }
+.bg-elevation-dark   { background-color: var(--color-elevation-dark); }
+.bg-accent-hover     { background-color: var(--color-accent-hover); }
+
+/* ── Border ──────────────────────────────────────── */
+.border-primary      { border-color: var(--color-primary); }
+.border-accent       { border-color: var(--color-accent); }
+.border-warning      { border-color: var(--color-warning); }
+.border-danger       { border-color: var(--color-danger); }
+
+/* ── Stroke (SVG) ────────────────────────────────── */
+.stroke-primary      { stroke: var(--color-primary); }
+.stroke-accent       { stroke: var(--color-accent); }
+.stroke-warning      { stroke: var(--color-warning); }
+.stroke-danger       { stroke: var(--color-danger); }
+
+/* ── Gradients ───────────────────────────────────── */
+.from-primary        { --tw-gradient-from: var(--color-primary); }
+.from-accent         { --tw-gradient-from: var(--color-accent); }
+.from-warning        { --tw-gradient-from: var(--color-warning); }
+.from-danger         { --tw-gradient-from: var(--color-danger); }
+
+.to-primary          { --tw-gradient-to: var(--color-primary); }
+.to-accent           { --tw-gradient-to: var(--color-accent); }
+.to-warning          { --tw-gradient-to: var(--color-warning); }
+.to-danger           { --tw-gradient-to: var(--color-danger); }
+
+/* ── Hover/Active interaction states ────────────── */
+.hover\:bg-primary-hover:hover   { background-color: var(--color-primary-hover); }
+.hover\:bg-primary-active:hover  { background-color: var(--color-primary-active); }
+.hover\:bg-accent-hover:hover    { background-color: var(--color-accent-hover); }
+.active\:bg-primary-active:active { background-color: var(--color-primary-active); }
+
+/* ── Dark mode ───────────────────────────────────── */
+.dark .dark\:bg-surface-dark    { background-color: var(--color-surface-dark); }
+.dark .dark\:bg-bg-dark         { background-color: var(--color-bg-dark); }
+.dark .dark\:bg-elevation-dark  { background-color: var(--color-elevation-dark); }
+.dark .dark\:text-accent        { color: var(--color-accent); }
+.dark .dark\:text-primary       { color: var(--color-primary); }
