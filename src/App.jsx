@@ -131,9 +131,31 @@ export default function App() {
               </div>
             </div>
 
-            {/* Mobile nav drawer */}
-            {mobileNav && (
-              <div className="lg:hidden border-t border-neutral-100 dark:border-white/5 p-3 space-y-0.5 bg-white dark:bg-surface-dark">
+          </header>
+
+          {/* Mobile nav drawer — slide-in panel + backdrop */}
+          <div className={`lg:hidden fixed inset-0 z-50 ${mobileNav ? "" : "pointer-events-none"}`}>
+            {/* Backdrop */}
+            <div
+              onClick={() => setMobileNav(false)}
+              className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${mobileNav ? "opacity-100" : "opacity-0"}`}
+            />
+            {/* Panel */}
+            <aside
+              className={`absolute top-0 left-0 h-full w-72 max-w-[82%] bg-white dark:bg-surface-dark border-r border-neutral-200 dark:border-white/5 shadow-2xl flex flex-col transition-transform duration-300 ease-out ${mobileNav ? "translate-x-0" : "-translate-x-full"}`}
+            >
+              <div className="flex items-center justify-between px-5 h-14 border-b border-neutral-100 dark:border-white/5">
+                <Logo />
+                <button
+                  onClick={() => setMobileNav(false)}
+                  className="w-9 h-9 rounded-lg text-neutral-500 hover:bg-neutral-100 dark:hover:bg-white/5 hover:text-neutral-800 dark:hover:text-white flex items-center justify-center active:scale-95 transition"
+                  aria-label="Tutup menu"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
                 {nav.map((n) => {
                   const Icon = n.icon;
                   const active = screen === n.id;
@@ -141,10 +163,10 @@ export default function App() {
                     <button
                       key={n.id}
                       onClick={() => { setScreen(n.id); setMobileNav(false); }}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition active:scale-[0.98]
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all active:scale-[0.98]
                         ${active
                           ? "bg-primary/10 text-primary font-semibold dark:bg-accent/15 dark:text-accent"
-                          : "text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-white/5"
+                          : "text-neutral-500 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-white/5 hover:text-neutral-800 dark:hover:text-white"
                         }`}
                       style={{ fontSize: 14 }}
                     >
@@ -152,9 +174,16 @@ export default function App() {
                     </button>
                   );
                 })}
+              </nav>
+
+              <div className="p-3 border-t border-neutral-100 dark:border-white/5">
+                <div className="rounded-2xl p-3.5 bg-linear-to-br from-primary to-accent text-white">
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>Wellness coach</div>
+                  <p className="mt-1 text-white/80" style={{ fontSize: 12, lineHeight: 1.5 }}>Pair FitWork with a 1:1 weekly check-in.</p>
+                </div>
               </div>
-            )}
-          </header>
+            </aside>
+          </div>
 
           {/* Page content */}
           <main className="flex-1">

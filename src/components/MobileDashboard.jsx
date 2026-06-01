@@ -1,12 +1,23 @@
 ﻿import { Activity, Brain, Clock, Coffee, Bell, Sparkles, Lightbulb } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 import { Card, GaugeRing, StatusPill, Avatar, Logo } from "./shared";
-
-const data = [
-  { v: 65 }, { v: 78 }, { v: 88 }, { v: 72 }, { v: 60 }, { v: 85 }, { v: 90 }, { v: 76 },
-];
+import { useHealthData } from "../hooks/useHealthData";
 
 export function MobileDashboard({ onTriggerBreak }) {
+  const { data, history, isLive } = useHealthData();
+  const { focusScore, stressLevel, fatigueScore, sessionInfo, breakWarning } = data;
+  const focus = Math.round(focusScore);
+  const trend = history.map((h) => ({ v: h.productivity }));
+  const cards = [
+    { l: "Focus", v: String(focus), u: "/100", s: focus >= 70 ? "normal" : "warning", i: <Brain size={16} /> },
+    { l: "Stress", v: String(Math.round(stressLevel)), u: "%", s: stressLevel > 40 ? "warning" : "normal", i: <Activity size={16} /> },
+    { l: "Active", v: `${sessionInfo.activeWorkHours}h`, s: "normal", i: <Clock size={16} /> },
+    { l: "Fatigue", v: String(Math.round(fatigueScore)), u: "%", s: fatigueScore > 35 ? "warning" : "normal", i: <Coffee size={16} /> },
+  ];
+  const insightText = breakWarning?.triggered
+    ? `Break suggested (${breakWarning.recommendedMinutes} min). Stress ${Math.round(stressLevel)}%, fatigue ${Math.round(fatigueScore)}%.`
+    : `Focus at ${focus}/100. Keep your current break cadence to stay in flow.`;
+
   return (
     <div className="mx-auto bg-bg-light dark:bg-bg-dark overflow-hidden rounded-[40px] border border-neutral-200 dark:border-white/10 shadow-2xl" style={{ width: 390, minHeight: 780 }}>
       <div className="flex items-center justify-between px-5 pt-3 pb-1" style={{ fontSize: 12, fontFamily: "'JetBrains Mono', monospace" }}>
@@ -29,25 +40,20 @@ export function MobileDashboard({ onTriggerBreak }) {
 
       <div className="px-5 space-y-4">
         <div className="flex items-center gap-3">
-          <GaugeRing value={87} size={80} status="normal" />
+          <GaugeRing value={focus} size={80} status={focus >= 70 ? "normal" : "warning"} />
           <div>
             <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 20, fontWeight: 600 }} className="text-neutral-900 dark:text-white">
               Hi, Raditya
             </h2>
             <p className="text-neutral-500 mt-0.5" style={{ fontSize: 12.5, lineHeight: 1.5 }}>
-              Focus today: <span className="text-primary dark:text-accent" style={{ fontWeight: 600 }}>87/100</span>
+              Focus today: <span className="text-primary dark:text-accent" style={{ fontWeight: 600 }}>{focus}/100</span>
             </p>
-            <StatusPill status="normal" label="Live session" />
+            <StatusPill status={isLive ? "normal" : "inactive"} label={isLive ? "Live session" : "Offline"} />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          {[
-            { l: "Focus", v: "87", u: "/100", s: "normal", i: <Brain size={16} /> },
-            { l: "Stress", v: "42", u: "%", s: "warning", i: <Activity size={16} /> },
-            { l: "Active", v: "5h 24m", s: "normal", i: <Clock size={16} /> },
-            { l: "Breaks", v: "68", u: "%", s: "warning", i: <Coffee size={16} /> },
-          ].map((m) => (
+          {cards.map((m) => (
             <Card key={m.l} className="p-3.5 active:scale-[0.98] transition">
               <div className="flex items-center justify-between">
                 <span style={{ fontSize: 12 }} className="text-neutral-500">{m.l}</span>
@@ -68,8 +74,8 @@ export function MobileDashboard({ onTriggerBreak }) {
           </div>
           <div className="h-20">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data}>
-                <Line type="monotone" dataKey="v" stroke="#0F6E56" strokeWidth={2.5} dot={false} />
+              <LineChart data={trend}>
+                <Line type="monotone" dataKey="v" stroke="#0F6E56" strokeWidth={2.5} dot={false} isAnimationActive={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -83,7 +89,7 @@ export function MobileDashboard({ onTriggerBreak }) {
             <div>
               <div className="text-neutral-900 dark:text-white" style={{ fontSize: 13, fontWeight: 600 }}>AI Insight</div>
               <p className="text-neutral-500 mt-0.5" style={{ fontSize: 12, lineHeight: 1.5 }}>
-                Stress index rose 18%. A 5-min stretch could reset your focus.
+                {insightText}
               </p>
             </div>
           </div>

@@ -1,7 +1,17 @@
 import { useState } from "react";
-import { Brain, Dumbbell, Apple, Moon, Share2, Download } from "lucide-react";
+import { Brain, Dumbbell, Apple, Moon, Share2, Download, AlertTriangle, Coffee } from "lucide-react";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
 import { Card, PrimaryButton, GhostButton } from "./shared";
+import { useHealthData } from "../hooks/useHealthData";
+
+const PERCLOS_THRESHOLD = Number(import.meta.env.VITE_PERCLOS_THRESHOLD) || 0.4;
+
+const REASON_COPY = {
+  stress_index_high: { title: "Stress index is high", body: "Your stress level crossed the safe threshold. Step away and reset before continuing." },
+  fatigue_detected: { title: "Fatigue detected", body: "Sustained fatigue is hurting your recovery. A real break will restore alertness." },
+  long_session: { title: "You've been working a long stretch", body: "Long uninterrupted sessions reduce focus quality. Take a short break to stay sharp." },
+  cognitive_overload: { title: "Cognitive overload", body: "Both stress and fatigue are elevated. Your brain needs a genuine pause now." },
+};
 
 const tabs = [
   { id: "mental",   label: "Mental",    icon: <Brain size={15} /> },
@@ -33,14 +43,38 @@ const recs = {
   ],
 };
 
-const radarData = [
-  { dim: "Focus", val: 78 }, { dim: "Stress", val: 55 }, { dim: "Fatigue", val: 42 },
-  { dim: "Posture", val: 80 }, { dim: "Cognitive Load", val: 65 },
-];
+function clamp(n) {
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
 
 export function Recommendations() {
   const [tab, setTab] = useState("mental");
   const currentTab = tabs.find((t) => t.id === tab);
+  const { data } = useHealthData();
+  const { focusScore, stressLevel, fatigueScore, vitals, breakWarning } = data;
+
+  // Health score gabungan (focus tinggi baik; stress/fatigue rendah baik)
+  const healthScore = clamp((focusScore + (100 - stressLevel) + (100 - fatigueScore)) / 3);
+  const risk = healthScore >= 75 ? { label: "Low Risk", cls: "bg-accent/15 text-primary dark:text-accent" }
+    : healthScore >= 55 ? { label: "Moderate Risk", cls: "bg-warning/15 text-warning" }
+    : { label: "High Risk", cls: "bg-danger/15 text-danger" };
+
+  // Segmen progress bar proporsional terhadap komponen skor
+  const good = clamp(focusScore);
+  const moderate = clamp(stressLevel);
+  const poor = clamp(fatigueScore);
+  const total = good + moderate + poor || 1;
+
+  // Radar dari pembacaan API
+  const radarData = [
+    { dim: "Focus", val: clamp(focusScore) },
+    { dim: "Calm", val: clamp(100 - stressLevel) },
+    { dim: "Energy", val: clamp(100 - fatigueScore) },
+    { dim: "Eye Health", val: clamp(100 - (vitals.perclos / PERCLOS_THRESHOLD) * 100) },
+    { dim: "Cognitive Load", val: clamp(vitals.pupilDilation * 100) },
+  ];
+
+  const reason = breakWarning?.reason ? REASON_COPY[breakWarning.reason] : null;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-5 lg:space-y-6">
@@ -51,17 +85,37 @@ export function Recommendations() {
         <p className="text-neutral-500 dark:text-neutral-400 mt-1" style={{ fontSize: 14 }}>Personalized actions based on today's session.</p>
       </div>
 
+      {/* AI Advisor — break warning card (muncul kalau triggered) */}
+      {breakWarning?.triggered && reason && (
+        <Card className="p-5 border-warning/40 bg-linear-to-br from-warning/10 to-transparent">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-warning/15 text-warning flex items-center justify-center shrink-0">
+                <AlertTriangle size={22} />
+              </div>
+              <div>
+                <div className="text-neutral-900 dark:text-white font-semibold">{reason.title}</div>
+                <p className="text-neutral-500 dark:text-neutral-400 text-sm mt-1 max-w-xl leading-relaxed">{reason.body}</p>
+              </div>
+            </div>
+            <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-warning text-white text-sm font-semibold shrink-0">
+              <Coffee size={16} /> Break {breakWarning.recommendedMinutes} min
+            </div>
+          </div>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 lg:gap-6">
 
         <Card className="xl:col-span-2 p-5 lg:p-6">
-          {/* Score header */}
+          {/* Score header — dari API */}
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
               <div className="text-neutral-500 dark:text-neutral-400 text-sm">Today's Health Score</div>
               <div className="flex items-baseline gap-2 mt-1">
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 36, fontWeight: 600 }} className="text-neutral-900 dark:text-white">74</span>
+                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 36, fontWeight: 600 }} className="text-neutral-900 dark:text-white">{healthScore}</span>
                 <span className="text-neutral-400 text-sm">/ 100</span>
-                <span className="ml-1 px-2 py-0.5 rounded-lg bg-warning/15 text-warning text-xs font-semibold">Moderate Risk</span>
+                <span className={`ml-1 px-2 py-0.5 rounded-lg text-xs font-semibold ${risk.cls}`}>{risk.label}</span>
               </div>
             </div>
             <div className="flex gap-2 shrink-0">
@@ -70,11 +124,11 @@ export function Recommendations() {
             </div>
           </div>
 
-          {/* Progress bar */}
+          {/* Progress bar proporsional */}
           <div className="mt-4 h-2.5 rounded-full bg-neutral-100 dark:bg-white/5 overflow-hidden flex">
-            <div className="h-full bg-accent"   style={{ width: "40%" }} />
-            <div className="h-full bg-warning"  style={{ width: "34%" }} />
-            <div className="h-full bg-danger/70" style={{ width: "26%" }} />
+            <div className="h-full bg-accent"   style={{ width: `${(good / total) * 100}%` }} />
+            <div className="h-full bg-warning"  style={{ width: `${(moderate / total) * 100}%` }} />
+            <div className="h-full bg-danger/70" style={{ width: `${(poor / total) * 100}%` }} />
           </div>
 
           {/* Tab buttons */}
@@ -109,7 +163,7 @@ export function Recommendations() {
           </div>
         </Card>
 
-        {/* Wellness radar */}
+        {/* Wellness radar — dari API */}
         <Card className="p-5 lg:p-6">
           <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 600 }} className="text-neutral-900 dark:text-white">Wellness profile</h3>
           <p className="text-neutral-400 dark:text-neutral-500 mt-1 text-sm">5-dimension balance</p>
@@ -118,7 +172,7 @@ export function Recommendations() {
               <RadarChart data={radarData}>
                 <PolarGrid stroke="currentColor" strokeOpacity={0.1} />
                 <PolarAngleAxis dataKey="dim" tick={{ fontSize: 11, fill: "#9ca3af" }} />
-                <Radar dataKey="val" stroke="#0F6E56" fill="#1D9E75" fillOpacity={0.25} />
+                <Radar dataKey="val" stroke="#0F6E56" fill="#1D9E75" fillOpacity={0.25} isAnimationActive={false} />
               </RadarChart>
             </ResponsiveContainer>
           </div>

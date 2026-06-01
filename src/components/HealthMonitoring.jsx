@@ -1,15 +1,9 @@
 import { motion } from "motion/react";
 import { Heart, Eye, Zap } from "lucide-react";
 import { Card, GaugeRing, StatusPill, TimelineItem } from "./shared";
+import { useHealthData } from "../hooks/useHealthData";
 
-const events = [
-  { time: "2:30 PM", text: "Stress spike detected — heart rate variability dropped", type: "critical" },
-  { time: "2:15 PM", text: "Eye strain warning — blink rate below normal",            type: "warning" },
-  { time: "1:50 PM", text: "Posture realigned — good",                                type: "info" },
-  { time: "1:20 PM", text: "Hydration reminder accepted",                             type: "info" },
-  { time: "12:45 PM", text: "Focus session: 45 min sustained attention",              type: "info" },
-  { time: "12:00 PM", text: "Pupil dilation increased — cognitive load high",         type: "warning" },
-];
+const PERCLOS_THRESHOLD = Number(import.meta.env.VITE_PERCLOS_THRESHOLD) || 0.4;
 
 function FaceMesh() {
   const points = [
@@ -34,7 +28,40 @@ function FaceMesh() {
   );
 }
 
+// Bangun timeline kontekstual dari pembacaan terkini (bukan data statis)
+function buildTimeline({ stressLevel, fatigueScore, vitals, focusScore }, now) {
+  const t = (offsetMin) => {
+    const d = new Date(now.getTime() - offsetMin * 60000);
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
+  const items = [];
+  if (stressLevel > 65) items.push({ time: t(0), text: `Stress spike detected — index at ${Math.round(stressLevel)}%`, type: "critical" });
+  else if (stressLevel > 40) items.push({ time: t(0), text: `Stress index rising — now ${Math.round(stressLevel)}%`, type: "warning" });
+  else items.push({ time: t(0), text: `Stress index stable at ${Math.round(stressLevel)}%`, type: "info" });
+
+  if (vitals.perclos > PERCLOS_THRESHOLD) items.push({ time: t(5), text: `Eye strain warning — PERCLOS ${vitals.perclos}`, type: "warning" });
+  else items.push({ time: t(5), text: `Blink rate normal — PERCLOS ${vitals.perclos}`, type: "info" });
+
+  if (vitals.pupilDilation > 0.6) items.push({ time: t(12), text: "Pupil dilation increased — cognitive load high", type: "warning" });
+  if (fatigueScore > 60) items.push({ time: t(18), text: `Fatigue elevated — score ${Math.round(fatigueScore)}%`, type: "critical" });
+  else items.push({ time: t(18), text: `Fatigue under control — ${Math.round(fatigueScore)}%`, type: "info" });
+
+  items.push({ time: t(25), text: `Focus session sustained — ${Math.round(focusScore)}/100`, type: "info" });
+  return items;
+}
+
 export function HealthMonitoring() {
+  const { data, isLive } = useHealthData();
+  const { vitals, stressLevel, fatigueScore } = data;
+
+  const hrStatus = vitals.heartRate > 100 ? "warning" : "normal";
+  const pupilPct = Math.round(vitals.pupilDilation * 100);
+  const pupilStatus = vitals.pupilDilation > 0.6 ? "warning" : "normal";
+  const perclosStatus = vitals.perclos > PERCLOS_THRESHOLD ? "alert" : vitals.perclos > PERCLOS_THRESHOLD * 0.7 ? "warning" : "normal";
+  const perclosWidth = `${Math.min((vitals.perclos / PERCLOS_THRESHOLD) * 100, 100)}%`;
+
+  const events = buildTimeline(data, new Date());
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-5 lg:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -42,11 +69,13 @@ export function HealthMonitoring() {
           <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: "clamp(20px,4vw,28px)", fontWeight: 600 }} className="text-neutral-900 dark:text-white">
             Health Monitoring
           </h1>
-          <p className="text-neutral-500 dark:text-neutral-400 mt-1" style={{ fontSize: 14 }}>Real-time analysis · Session 02:14:38</p>
+          <p className="text-neutral-500 dark:text-neutral-400 mt-1" style={{ fontSize: 14 }}>
+            Real-time analysis · {isLive ? "live feed" : "offline (mock)"}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <StatusPill status="normal"  label="Normal" />
-          <StatusPill status="warning" label="Caution: eye strain" />
+          <StatusPill status={stressLevel > 65 ? "alert" : "normal"} label={stressLevel > 65 ? "High stress" : "Normal"} />
+          {vitals.perclos > PERCLOS_THRESHOLD && <StatusPill status="warning" label="Caution: eye strain" />}
         </div>
       </div>
 
@@ -68,10 +97,10 @@ export function HealthMonitoring() {
             </div>
             <div className="absolute bottom-3 left-3 right-3">
               <div className="text-white/70 mb-1.5 flex justify-between text-xs font-mono">
-                <span>PERCLOS</span><span>0.18 / 0.40</span>
+                <span>PERCLOS</span><span>{vitals.perclos} / {PERCLOS_THRESHOLD}</span>
               </div>
               <div className="h-1.5 rounded-full bg-white/20 overflow-hidden">
-                <motion.div className="h-full bg-accent" initial={{ width: 0 }} animate={{ width: "45%" }} transition={{ duration: 1 }} />
+                <motion.div className="h-full bg-accent" initial={{ width: 0 }} animate={{ width: perclosWidth }} transition={{ duration: 1 }} />
               </div>
             </div>
           </div>
@@ -80,7 +109,7 @@ export function HealthMonitoring() {
           </p>
         </Card>
 
-        {/* Live vitals */}
+        {/* Live vitals — dari API */}
         <Card className="p-5">
           <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 600 }} className="text-neutral-900 dark:text-white mb-5">Live vitals</h3>
           <div className="space-y-6">
@@ -92,7 +121,7 @@ export function HealthMonitoring() {
                   <div className="text-neutral-400 text-xs">Resting baseline 68</div>
                 </div>
               </div>
-              <GaugeRing value={72} max={140} size={88} unit="bpm" status="normal" />
+              <GaugeRing value={vitals.heartRate} max={140} size={88} unit="bpm" status={hrStatus} />
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -102,17 +131,17 @@ export function HealthMonitoring() {
                   <div className="text-neutral-400 text-xs">Cognitive load index</div>
                 </div>
               </div>
-              <GaugeRing value={64} size={88} status="warning" />
+              <GaugeRing value={pupilPct} size={88} unit="%" status={pupilStatus} />
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-warning/10 text-warning flex items-center justify-center"><Zap size={18} /></div>
                 <div>
-                  <div className="text-neutral-600 dark:text-neutral-400 text-sm">Fatigue Score</div>
-                  <div className="text-neutral-400 text-xs">Rising in last 20 min</div>
+                  <div className="text-neutral-600 dark:text-neutral-400 text-sm">PERCLOS</div>
+                  <div className="text-neutral-400 text-xs">Eye closure ratio</div>
                 </div>
               </div>
-              <GaugeRing value={38} size={88} status="warning" />
+              <GaugeRing value={vitals.perclos} max={PERCLOS_THRESHOLD} size={88} status={perclosStatus} />
             </div>
           </div>
         </Card>
