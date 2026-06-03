@@ -7,6 +7,17 @@ import { useFaceVitals } from "../hooks/useFaceVitals";
 
 const PERCLOS_THRESHOLD = Number(import.meta.env.VITE_PERCLOS_THRESHOLD) || 0.4;
 
+/** Kotak statistik kecil untuk sinyal CV (ekspresi/postur). */
+function MiniStat({ label, value, tone = "ok" }) {
+  const isWarn = tone === "warn";
+  return (
+    <div className={`rounded-xl border px-3 py-2.5 ${isWarn ? "border-warning/30 bg-warning/10" : "border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-white/3"}`}>
+      <div className="text-neutral-500 dark:text-neutral-400 text-xs">{label}</div>
+      <div className={`mt-0.5 font-semibold text-sm ${isWarn ? "text-warning" : "text-neutral-800 dark:text-white"}`}>{value}</div>
+    </div>
+  );
+}
+
 /** Kamera nyata + overlay PERCLOS dari MediaPipe FaceMesh. */
 function CameraFeed({ face }) {
   const { videoRef, canvasRef, vitals, status, start, stop } = face;
@@ -124,23 +135,27 @@ function buildTimeline({ stressLevel, fatigueScore, vitals, focusScore }, now) {
 export function HealthMonitoring() {
   const face = useFaceVitals();
   const camLive = face.status === "running" && face.vitals.faceDetected;
+  const fv = face.vitals;
 
-  // Kirim vitals kamera ke backend ML saat kamera aktif; jika tidak, hook
-  // tetap menarik data mock/terakhir agar UI tidak pernah kosong.
-  const { data, isLive, transport } = useHealthData(camLive ? face.vitals : null);
+  // Kirim vitals kamera (incl. isSlumping) ke backend ML saat kamera aktif.
+  const { data, isLive, transport } = useHealthData(camLive ? fv : null);
 
-  // Saat kamera live, vitals yang ditampilkan = hasil CV nyata (bukan API).
-  const vitals = camLive
-    ? { ...data.vitals, ...face.vitals }
-    : data.vitals;
+  // Saat kamera live, vitals dari CV adalah sumber kebenaran. Nilai null
+  // (belum/tidak terdeteksi) ditampilkan sebagai N/A — TIDAK diisi default.
+  const live = camLive;
+  const heartRate = live ? fv.heartRate : data.vitals.heartRate;
+  const perclos = live ? fv.perclos : data.vitals.perclos;
+  const pupilDilation = live ? fv.pupilDilation : data.vitals.pupilDilation;
   const { stressLevel, fatigueScore } = data;
 
-  const hrStatus = vitals.heartRate > 100 ? "warning" : "normal";
-  const pupilPct = Math.round(vitals.pupilDilation * 100);
-  const pupilStatus = vitals.pupilDilation > 0.6 ? "warning" : "normal";
-  const perclosStatus = vitals.perclos > PERCLOS_THRESHOLD ? "alert" : vitals.perclos > PERCLOS_THRESHOLD * 0.7 ? "warning" : "normal";
+  // Status gauge (abaikan saat null)
+  const hrStatus = heartRate == null ? "normal" : heartRate > 100 ? "warning" : "normal";
+  const pupilPct = pupilDilation == null ? null : Math.round(pupilDilation * 100);
+  const pupilStatus = pupilDilation == null ? "normal" : pupilDilation > 0.6 ? "warning" : "normal";
+  const perclosStatus = perclos == null ? "normal" : perclos > PERCLOS_THRESHOLD ? "alert" : perclos > PERCLOS_THRESHOLD * 0.7 ? "warning" : "normal";
 
-  const events = buildTimeline({ ...data, vitals }, new Date());
+  const vitals = { heartRate, perclos, pupilDilation };
+  const events = buildTimeline({ ...data, vitals: { ...data.vitals } }, new Date());
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-5 lg:space-y-6">
@@ -157,9 +172,18 @@ export function HealthMonitoring() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <StatusPill status={stressLevel > 65 ? "alert" : "normal"} label={stressLevel > 65 ? "High stress" : "Normal"} />
-          {vitals.perclos > PERCLOS_THRESHOLD && <StatusPill status="warning" label="Caution: eye strain" />}
+          {perclos != null && perclos > PERCLOS_THRESHOLD && <StatusPill status="warning" label="Caution: eye strain" />}
+          {fv.isSlumping && <StatusPill status="warning" label="Slumping posture" />}
+          {fv.expression && fv.expression.tension > 0.5 && <StatusPill status="warning" label="Facial tension" />}
         </div>
       </div>
+
+      {/* Banner saat kamera aktif tapi wajah tidak terdeteksi */}
+      {face.status === "no-face" && (
+        <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning flex items-center gap-2">
+          <Eye size={16} /> Wajah tidak terdeteksi — posisikan wajah di depan kamera. Vitals ditandai N/A sampai terbaca.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 lg:gap-6">
 
@@ -175,10 +199,12 @@ export function HealthMonitoring() {
                 <div className="w-10 h-10 rounded-xl bg-danger/10 text-danger flex items-center justify-center"><Heart size={18} /></div>
                 <div>
                   <div className="text-neutral-600 dark:text-neutral-400 text-sm">Heart Rate (rPPG)</div>
-                  <div className="text-neutral-400 text-xs">Resting baseline 68</div>
+                  <div className="text-neutral-400 text-xs">
+                    {live && !fv.hrReady ? "Calibrating rPPG…" : `HRV ${fv.hrv != null ? fv.hrv + " ms" : "--"}`}
+                  </div>
                 </div>
               </div>
-              <GaugeRing value={vitals.heartRate} max={140} size={88} unit="bpm" status={hrStatus} />
+              <GaugeRing value={heartRate} max={140} size={88} unit="bpm" status={hrStatus} />
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -198,7 +224,21 @@ export function HealthMonitoring() {
                   <div className="text-neutral-400 text-xs">Eye closure ratio</div>
                 </div>
               </div>
-              <GaugeRing value={vitals.perclos} max={PERCLOS_THRESHOLD} size={88} status={perclosStatus} />
+              <GaugeRing value={perclos} max={PERCLOS_THRESHOLD} size={88} status={perclosStatus} />
+            </div>
+
+            {/* FER (ekspresi) & postur — sinyal CV tambahan */}
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <MiniStat
+                label="Facial tension"
+                value={fv.expression ? `${Math.round(fv.expression.tension * 100)}%` : "--"}
+                tone={fv.expression && fv.expression.tension > 0.5 ? "warn" : "ok"}
+              />
+              <MiniStat
+                label="Posture"
+                value={fv.posture != null ? (fv.isSlumping ? "Slumping" : "Upright") : "--"}
+                tone={fv.isSlumping ? "warn" : "ok"}
+              />
             </div>
           </div>
         </Card>

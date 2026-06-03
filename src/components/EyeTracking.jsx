@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { motion } from "motion/react";
-import { MousePointer, Hand, ArrowDownUp, ZoomIn, RefreshCw, CheckCircle2 } from "lucide-react";
-import { Card, Toggle, GhostButton } from "./shared";
+import { MousePointer, Hand, ArrowDownUp, ZoomIn, Camera as CameraIcon, CameraOff, Loader2, CheckCircle2 } from "lucide-react";
+import { Card, Toggle } from "./shared";
+import { useGazeGesture } from "../hooks/useGazeGesture";
 
 const gestures = [
   { icon: <MousePointer size={20} />, name: "Cursor Move", hint: "Open palm, slow drift" },
@@ -11,9 +12,14 @@ const gestures = [
 ];
 
 export function EyeTracking() {
-  const [eye, setEye]       = useState(true);
-  const [gesture, setGesture] = useState(true);
-  const [auto, setAuto]     = useState(false);
+  const { videoRef, gaze, gesture, fps, status, start, stop } = useGazeGesture();
+  const [eye, setEye]         = useState(true);
+  const [gestureOn, setGesture] = useState(true);
+  const [auto, setAuto]       = useState(false);
+
+  const running = status === "running";
+  const active = running || status === "loading";
+  const activeGestureName = gesture?.name && gesture.name !== "Idle" ? gesture.name : null;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-5 lg:space-y-6">
@@ -21,84 +27,130 @@ export function EyeTracking() {
         <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: "clamp(20px,4vw,28px)", fontWeight: 600 }} className="text-neutral-900 dark:text-white">
           Smart Control Center
         </h1>
-        <p className="text-neutral-500 dark:text-neutral-400 mt-1" style={{ fontSize: 14 }}>Non-invasive navigation · powered by AI</p>
+        <p className="text-neutral-500 dark:text-neutral-400 mt-1" style={{ fontSize: 14 }}>
+          Non-invasive navigation · {running ? "live tracking" : "camera off"}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 lg:gap-6">
 
-        {/* Live gaze */}
+        {/* Live gaze — kamera nyata + titik gaze dari iris */}
         <Card className="p-5">
-          <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 600 }} className="text-neutral-900 dark:text-white mb-3">Live gaze</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 600 }} className="text-neutral-900 dark:text-white">Live gaze</h3>
+            {active && (
+              <button onClick={stop} className="text-neutral-400 hover:text-danger transition" aria-label="Stop">
+                <CameraOff size={16} />
+              </button>
+            )}
+          </div>
           <div className="relative aspect-4/3 rounded-xl overflow-hidden bg-neutral-900">
-            <div className="absolute inset-0 bg-linear-to-br from-primary/20 via-transparent to-accent/10" />
-            <div className="absolute inset-0 grid grid-cols-12 grid-rows-9 opacity-10">
-              {[...Array(108)].map((_, i) => <div key={i} className="border border-white/30" />)}
-            </div>
-            <motion.div
-              className="absolute w-12 h-12 -ml-6 -mt-6 rounded-full bg-accent/30 backdrop-blur-sm"
-              animate={{ left: ["30%","65%","55%","40%","30%"], top: ["40%","30%","60%","55%","40%"] }}
-              transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-            >
-              <div className="absolute inset-0 m-auto w-3 h-3 rounded-full bg-accent shadow-[0_0_20px_#1D9E75]" />
-            </motion.div>
+            <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: "scaleX(-1)" }} />
+
+            {!active && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-linear-to-br from-primary/20 via-transparent to-accent/10">
+                <CameraIcon size={26} className="text-white/70" />
+                <button onClick={start} className="px-4 py-2 rounded-xl bg-accent hover:bg-accent/90 text-white text-sm font-semibold active:scale-95 transition">
+                  Start tracking
+                </button>
+                {status === "denied" && <span className="text-danger text-xs">Izin kamera ditolak</span>}
+                {status === "error" && <span className="text-danger text-xs">Gagal memuat model</span>}
+              </div>
+            )}
+
+            {status === "loading" && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                <Loader2 size={24} className="text-white animate-spin" />
+              </div>
+            )}
+
+            {/* Titik gaze nyata */}
+            {running && gaze && (
+              <motion.div
+                className="absolute w-12 h-12 -ml-6 -mt-6 rounded-full bg-accent/30 backdrop-blur-sm pointer-events-none"
+                animate={{ left: `${gaze.x * 100}%`, top: `${gaze.y * 100}%` }}
+                transition={{ type: "tween", duration: 0.12 }}
+              >
+                <div className="absolute inset-0 m-auto w-3 h-3 rounded-full bg-accent shadow-[0_0_20px_#1D9E75]" />
+              </motion.div>
+            )}
+
             <div className="absolute bottom-3 left-3 right-3 flex justify-between text-white/70 text-xs font-mono">
-              <span>gaze: x 0.62, y 0.34</span>
-              <span>30 fps</span>
+              <span>{gaze ? `gaze: x ${gaze.x} y ${gaze.y}` : "gaze: --"}</span>
+              <span>{running ? `${fps} fps` : "offline"}</span>
             </div>
+            {running && !gaze && (
+              <div className="absolute top-3 left-3 px-2 py-0.5 rounded-md bg-warning/80 text-white text-xs">No face</div>
+            )}
           </div>
           <p className="text-neutral-400 dark:text-neutral-500 mt-3 text-xs leading-relaxed">
-            Look at any UI element. Confirm with a pinch gesture.
+            Look around — the dot follows your iris. Make a gesture with your hand.
           </p>
         </Card>
 
-        {/* Gesture guide */}
+        {/* Gesture guide — highlight gesture yang AKTIF terdeteksi */}
         <Card className="p-5">
-          <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 600 }} className="text-neutral-900 dark:text-white mb-3">Gesture guide</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 600 }} className="text-neutral-900 dark:text-white">Gesture guide</h3>
+            {running && (
+              <span className="text-xs font-mono text-accent">
+                {activeGestureName ? `▶ ${activeGestureName}` : "no hand"}
+              </span>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-3">
-            {gestures.map((g, i) => (
-              <motion.div
-                key={g.name}
-                whileHover={{ y: -2 }}
-                className="p-4 rounded-2xl border border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-white/3 hover:border-accent/40 transition"
-              >
-                <div className="w-10 h-10 rounded-xl bg-accent/10 text-primary dark:text-accent flex items-center justify-center">
-                  {g.icon}
-                </div>
-                <div className="mt-3 text-neutral-800 dark:text-white font-semibold text-sm">{g.name}</div>
-                <div className="text-neutral-500 dark:text-neutral-400 mt-0.5 text-xs">{g.hint}</div>
-                <motion.div className="mt-2 h-1 rounded-full bg-accent/15 overflow-hidden" initial={{ opacity: 0.5 }} animate={{ opacity: 1 }}>
-                  <motion.div className="h-full bg-accent" animate={{ width: ["0%","100%","0%"] }} transition={{ duration: 2.5, repeat: Infinity, delay: i * 0.3 }} />
+            {gestures.map((g) => {
+              const isActive = activeGestureName === g.name;
+              return (
+                <motion.div
+                  key={g.name}
+                  animate={{ scale: isActive ? 1.03 : 1 }}
+                  className={`p-4 rounded-2xl border transition ${
+                    isActive
+                      ? "border-accent bg-accent/10"
+                      : "border-neutral-200 dark:border-white/10 bg-neutral-50 dark:bg-white/3"
+                  }`}
+                >
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isActive ? "bg-accent text-white" : "bg-accent/10 text-primary dark:text-accent"}`}>
+                    {g.icon}
+                  </div>
+                  <div className="mt-3 text-neutral-800 dark:text-white font-semibold text-sm">{g.name}</div>
+                  <div className="text-neutral-500 dark:text-neutral-400 mt-0.5 text-xs">{g.hint}</div>
+                  <div className="mt-2 h-1 rounded-full bg-accent/15 overflow-hidden">
+                    <motion.div className="h-full bg-accent" animate={{ width: isActive ? `${Math.round((gesture?.conf || 0) * 100)}%` : "0%" }} transition={{ duration: 0.2 }} />
+                  </div>
                 </motion.div>
-              </motion.div>
-            ))}
+              );
+            })}
           </div>
         </Card>
 
-        {/* Calibration */}
+        {/* Calibration / toggles */}
         <Card className="p-5 flex flex-col">
-          <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 600 }} className="text-neutral-900 dark:text-white">Calibration</h3>
+          <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 600 }} className="text-neutral-900 dark:text-white">Status</h3>
           <div className="mt-4 p-4 rounded-2xl bg-accent/8 border border-accent/25">
             <div className="flex items-center gap-2">
-              <CheckCircle2 size={18} className="text-accent" />
-              <span className="text-primary dark:text-accent font-semibold text-sm">Calibration accurate</span>
+              <CheckCircle2 size={18} className={running ? "text-accent" : "text-neutral-400"} />
+              <span className={`font-semibold text-sm ${running ? "text-primary dark:text-accent" : "text-neutral-400"}`}>
+                {running ? "Tracking active" : "Tracking idle"}
+              </span>
             </div>
             <div className="mt-3 flex items-baseline gap-1.5">
-              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 32, fontWeight: 600 }} className="text-neutral-900 dark:text-white">92</span>
-              <span className="text-neutral-500 text-sm">% accuracy</span>
+              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 32, fontWeight: 600 }} className="text-neutral-900 dark:text-white">
+                {running ? fps : "--"}
+              </span>
+              <span className="text-neutral-500 text-sm">fps</span>
             </div>
-            <div className="mt-3 h-2 rounded-full bg-neutral-200 dark:bg-white/10 overflow-hidden">
-              <motion.div className="h-full bg-linear-to-r from-accent to-primary" initial={{ width: 0 }} animate={{ width: "92%" }} transition={{ duration: 1.2 }} />
+            <div className="mt-1 text-neutral-400 text-xs">
+              {gesture ? `Hand: ${gesture.name} (${Math.round(gesture.conf * 100)}%)` : "No hand detected"}
             </div>
           </div>
-          <GhostButton className="mt-3 w-full">
-            <span className="inline-flex items-center justify-center gap-2 w-full"><RefreshCw size={14} /> Recalibrate</span>
-          </GhostButton>
 
           <div className="mt-6 space-y-4">
             {[
-              { label: "Eye tracking",       value: eye,     setter: setEye },
-              { label: "Gesture recognition", value: gesture, setter: setGesture },
-              { label: "Auto-sensitivity",   value: auto,    setter: setAuto },
+              { label: "Eye tracking",        value: eye,       setter: setEye },
+              { label: "Gesture recognition", value: gestureOn, setter: setGesture },
+              { label: "Auto-sensitivity",    value: auto,      setter: setAuto },
             ].map(({ label, value, setter }) => (
               <div key={label} className="flex items-center justify-between">
                 <span className="text-neutral-700 dark:text-neutral-200 text-sm">{label}</span>

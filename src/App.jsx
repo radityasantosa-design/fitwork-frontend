@@ -1,24 +1,22 @@
 import { useEffect, useState } from "react";
-import { LayoutDashboard, HeartPulse, Lightbulb, Eye, Settings as SettingsIcon, Bell, Sun, Moon, Menu, X, Smartphone, Palette, HelpCircle, LogIn } from "lucide-react";
+import { LayoutDashboard, HeartPulse, Lightbulb, Eye, ClipboardCheck, Settings as SettingsIcon, Bell, Sun, Moon, Menu, X, HelpCircle, LogIn } from "lucide-react";
 import { Logo } from "./components/shared";
 import { Login } from "./components/Login";
 import { Dashboard } from "./components/Dashboard";
 import { HealthMonitoring } from "./components/HealthMonitoring";
 import { Recommendations } from "./components/Recommendations";
 import { EyeTracking } from "./components/EyeTracking";
+import { Assessment } from "./components/Assessment";
 import { Settings } from "./components/Settings";
 import { BreakModal } from "./components/BreakModal";
-import { DesignTokens } from "./components/DesignTokens";
-import { MobilePreview } from "./components/MobilePreview";
 import { Onboarding } from "./components/Onboarding";
 
 const nav = [
   { id: "dashboard",       label: "Dashboard",       icon: LayoutDashboard },
   { id: "health",          label: "Health Monitor",  icon: HeartPulse },
+  { id: "assessment",      label: "Assessment",      icon: ClipboardCheck },
   { id: "recommendations", label: "Recommendations", icon: Lightbulb },
   { id: "eye",             label: "Eye & Gesture",   icon: Eye },
-  { id: "mobile",          label: "Mobile (390px)",  icon: Smartphone },
-  { id: "tokens",          label: "Design Tokens",   icon: Palette },
   { id: "settings",        label: "Settings",        icon: SettingsIcon },
 ];
 
@@ -189,10 +187,9 @@ export default function App() {
           <main className="flex-1">
             {screen === "dashboard"       && <Dashboard onTriggerBreak={openBreak} />}
             {screen === "health"          && <HealthMonitoring />}
+            {screen === "assessment"      && <Assessment />}
             {screen === "recommendations" && <Recommendations />}
             {screen === "eye"             && <EyeTracking />}
-            {screen === "mobile"          && <MobilePreview />}
-            {screen === "tokens"          && <DesignTokens />}
             {screen === "settings"        && <Settings />}
           </main>
         </div>

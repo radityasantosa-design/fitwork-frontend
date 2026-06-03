@@ -177,10 +177,9 @@ export function Dashboard({ onTriggerBreak }) {
             <span className="text-neutral-700 dark:text-neutral-200 font-medium text-sm">{isLive ? "Live session" : "Offline (mock)"}</span>
           </div>
           <div className="flex flex-wrap items-center gap-4 text-neutral-500 dark:text-neutral-400 text-xs">
-            <span>Eye tracking: <span className="text-accent font-mono">active</span></span>
-            <span>Gesture: <span className="text-accent font-mono">active</span></span>
-            <span>HR: <span className="font-mono text-neutral-700 dark:text-neutral-200">{vitals.heartRate} bpm</span></span>
-            <span>PERCLOS: <span className="font-mono text-neutral-700 dark:text-neutral-200">{vitals.perclos}</span></span>
+            <span>Source: <span className={`font-mono ${data.source === "live" ? "text-accent" : "text-neutral-500"}`}>{data.source === "live" ? "camera" : "baseline"}</span></span>
+            <span>HR: <span className="font-mono text-neutral-700 dark:text-neutral-200">{vitals.heartRate != null ? `${vitals.heartRate} bpm` : "--"}</span></span>
+            <span>PERCLOS: <span className="font-mono text-neutral-700 dark:text-neutral-200">{vitals.perclos != null ? vitals.perclos : "--"}</span></span>
           </div>
         </div>
       </Card>

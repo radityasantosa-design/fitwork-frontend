@@ -50,8 +50,10 @@ export function GaugeRing({ value, max = 100, size = 140, label, unit, status = 
   const stroke = size < 100 ? 8 : 12;
   const radius = (size - stroke) / 2;
   const circ   = 2 * Math.PI * radius;
-  const pct    = Math.min(value / max, 1);
-  const c      = statusColors[status];
+  // value null/NaN = belum/tidak terdeteksi → tampilkan "--", ring kosong.
+  const missing = value == null || Number.isNaN(value);
+  const pct    = missing ? 0 : Math.min(value / max, 1);
+  const c      = missing ? statusColors.normal : statusColors[status];
   return (
     <div className="relative inline-flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
@@ -65,9 +67,9 @@ export function GaugeRing({ value, max = 100, size = 140, label, unit, status = 
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-neutral-900 dark:text-white font-semibold leading-none" style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: size * 0.22 }}>
-          {value}
-          {unit && <span className="text-neutral-400" style={{ fontSize: size * 0.11 }}> {unit}</span>}
+        <span className={`font-semibold leading-none ${missing ? "text-neutral-300 dark:text-white/30" : "text-neutral-900 dark:text-white"}`} style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: size * 0.22 }}>
+          {missing ? "--" : value}
+          {unit && !missing && <span className="text-neutral-400" style={{ fontSize: size * 0.11 }}> {unit}</span>}
         </span>
         {label && <span className="text-neutral-400 mt-0.5" style={{ fontSize: 11 }}>{label}</span>}
       </div>

@@ -65,7 +65,7 @@ export function Recommendations() {
   const poor = clamp(fatigueScore);
   const total = good + moderate + poor || 1;
 
-  // Radar dari pembacaan API
+  // Radar dari pembacaan API (5 dimensi: Focus/Calm/Energy/Eye/Cognitive)
   const radarData = [
     { dim: "Focus", val: clamp(focusScore) },
     { dim: "Calm", val: clamp(100 - stressLevel) },
@@ -75,6 +75,14 @@ export function Recommendations() {
   ];
 
   const reason = breakWarning?.reason ? REASON_COPY[breakWarning.reason] : null;
+
+  // Pilih tab yang paling relevan otomatis & urutkan rec berdasarkan kondisi.
+  // (stres tinggi → Mental; fatigue/perclos tinggi → Physical/Sleep)
+  const suggestedTab =
+    stressLevel > 65 ? "mental"
+    : fatigueScore > 60 ? "sleep"
+    : vitals.perclos > PERCLOS_THRESHOLD ? "physical"
+    : tab;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-5 lg:space-y-6">
@@ -132,7 +140,7 @@ export function Recommendations() {
           </div>
 
           {/* Tab buttons */}
-          <div className="mt-5 flex flex-wrap gap-2">
+          <div className="mt-5 flex flex-wrap gap-2 items-center">
             {tabs.map((t) => (
               <button
                 key={t.id}
@@ -141,9 +149,12 @@ export function Recommendations() {
                   tab === t.id
                     ? "bg-primary text-white border-primary"
                     : "border-neutral-200 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/5 hover:border-neutral-300"
-                }`}
+                } ${suggestedTab === t.id && tab !== t.id ? "ring-2 ring-accent/40" : ""}`}
               >
                 {t.icon} {t.label}
+                {suggestedTab === t.id && tab !== t.id && (
+                  <span className="ml-1 text-[10px] font-semibold text-primary dark:text-accent">AI</span>
+                )}
               </button>
             ))}
           </div>

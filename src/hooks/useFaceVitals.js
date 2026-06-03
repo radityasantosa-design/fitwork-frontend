@@ -34,11 +34,33 @@ const L_IRIS = [468, 469, 470, 471, 472]; // pusat + 4 tepi
 const R_IRIS = [473, 474, 475, 476, 477];
 // Titik dahi untuk ROI rPPG (di antara alis, area kulit stabil)
 const FOREHEAD = [10, 151, 9, 8, 107, 336];
+// Landmark untuk FER (ekspresi) & postur
+const BROW_L = 105, BROW_R = 334;       // alis dalam kiri/kanan
+const EYE_INNER_L = 133, EYE_INNER_R = 362;
+const MOUTH_L = 61, MOUTH_R = 291;      // sudut mulut
+const MOUTH_TOP = 13, MOUTH_BOTTOM = 14;
+const NOSE_TIP = 1, CHIN = 152, FACE_TOP = 10; // untuk head pitch
 
 const PERCLOS_THRESHOLD = Number(import.meta.env.VITE_PERCLOS_THRESHOLD) || 0.4;
 const EAR_CLOSED = 0.21; // di bawah ini mata dianggap "tertutup"
 const RPPG_WINDOW = 256; // ~8.5 dtk @ 30fps; cukup untuk satu estimasi FFT
 const RPPG_MIN_SAMPLES = 150; // mulai estimasi setelah ~5 dtk data
+
+// Nilai null = BELUM/TIDAK terdeteksi → UI tampilkan N/A, bukan default.
+const NO_DATA = {
+  heartRate: null,
+  hrv: null,
+  perclos: null,
+  pupilDilation: null,
+  blinkRate: null,
+  ear: null,
+  expression: null,
+  posture: null,
+  isSlumping: false,
+  faceDetected: false,
+  hrConfidence: 0,
+  hrReady: false,
+};
 
 let _scriptPromise = null;
 function loadFaceMeshScripts() {
@@ -77,6 +99,45 @@ function pupilRatio(lm, irisIdx, eye) {
   r /= irisIdx.length - 1;
   const eyeW = dist(lm[eye.left], lm[eye.right]);
   return eyeW === 0 ? 0 : (r * 2) / eyeW; // diameter iris / lebar mata
+}
+
+/**
+ * FER ringan (proksi beban mental) dari geometri FaceMesh — pendekatan
+ * Action Unit sederhana (lihat proposal §2b):
+ *  - browFurrow (AU4): jarak alis-ke-mata mengecil = alis berkerut/menukik
+ *  - mouthFrown (AU15): sudut mulut turun relatif tengah
+ * Skala ~0..1 (sudah dinormalisasi ke lebar wajah). Tinggi = tegang.
+ */
+function expression(lm) {
+  const faceW = dist(lm[EYE_INNER_L], lm[EYE_INNER_R]) || 1;
+  // Alis menukik: makin kecil jarak alis→mata, makin "berkerut".
+  const browGap = (dist(lm[BROW_L], lm[EYE_INNER_L]) + dist(lm[BROW_R], lm[EYE_INNER_R])) / 2 / faceW;
+  const browFurrow = Math.max(0, Math.min(1, (0.55 - browGap) / 0.35));
+  // Sudut mulut turun di bawah garis tengah bibir = "frown".
+  const mouthMidY = (lm[MOUTH_TOP].y + lm[MOUTH_BOTTOM].y) / 2;
+  const cornerY = (lm[MOUTH_L].y + lm[MOUTH_R].y) / 2;
+  const mouthFrown = Math.max(0, Math.min(1, ((cornerY - mouthMidY) / 0.03)));
+  // Indeks tegangan gabungan
+  const tension = Math.min(1, browFurrow * 0.6 + mouthFrown * 0.4);
+  return {
+    browFurrow: Number(browFurrow.toFixed(2)),
+    mouthFrown: Number(mouthFrown.toFixed(2)),
+    tension: Number(tension.toFixed(2)),
+  };
+}
+
+/**
+ * Postur (proksi is_slumping) dari head pitch via FaceMesh:
+ * rasio (hidung→dagu) / (puncak wajah→dagu). Saat kepala menunduk
+ * (membungkuk ke layar), wajah memendek secara vertikal → rasio turun.
+ * Mengembalikan { slumpScore 0..1, isSlumping bool }.
+ */
+function posture(lm) {
+  const noseChin = dist(lm[NOSE_TIP], lm[CHIN]);
+  const topChin = dist(lm[FACE_TOP], lm[CHIN]) || 1;
+  const ratio = noseChin / topChin; // ~0.5 tegak; mengecil saat menunduk
+  const slumpScore = Math.max(0, Math.min(1, (0.5 - ratio) / 0.18));
+  return { slumpScore: Number(slumpScore.toFixed(2)), isSlumping: slumpScore > 0.5 };
 }
 
 /**
@@ -134,18 +195,11 @@ export function useFaceVitals() {
   const lastBlink = useRef(false);
   const blinkTimes = useRef([]);
   const perclosWindow = useRef([]); // EAR<closed boolean dalam jendela bergulir
-  const hrRef = useRef(72);
+  const hrRef = useRef(null);       // null = belum ada estimasi valid
   const hrConfRef = useRef(0);
+  const bpmHistory = useRef([]);    // untuk HRV (variabilitas BPM)
 
-  const [vitals, setVitals] = useState({
-    heartRate: 72,
-    perclos: 0.18,
-    pupilDilation: 0.6,
-    blinkRate: 15,
-    ear: 0.3,
-    faceDetected: false,
-    hrConfidence: 0,
-  });
+  const [vitals, setVitals] = useState(NO_DATA);
   const [status, setStatus] = useState("idle");
 
   const onResults = useCallback((results) => {
@@ -160,7 +214,11 @@ export function useFaceVitals() {
 
     if (!faces || faces.length === 0) {
       setStatus("no-face");
-      setVitals((v) => ({ ...v, faceDetected: false }));
+      // Reset buffer rPPG: sinyal lama tidak valid setelah wajah hilang.
+      greenBuf.current = [];
+      hrRef.current = null;
+      hrConfRef.current = 0;
+      setVitals(NO_DATA); // tampilkan N/A, JANGAN tahan angka lama
       return;
     }
     setStatus("running");
@@ -188,8 +246,11 @@ export function useFaceVitals() {
     const pupilDilation =
       (pupilRatio(lm, L_IRIS, L_EYE) + pupilRatio(lm, R_IRIS, R_EYE)) / 2;
 
+    // ── FER (ekspresi) & postur ──
+    const expr = expression(lm);
+    const post = posture(lm);
+
     // ── rPPG: warna hijau rata-rata pada ROI dahi ──
-    let hr = hrRef.current;
     let hrConfidence = hrConfRef.current;
     if (videoRef.current && canvas) {
       const vw = videoRef.current.videoWidth;
@@ -224,22 +285,45 @@ export function useFaceVitals() {
         const est = estimateHeartRate(greenBuf.current, fps || 30);
         if (est) {
           // smoothing eksponensial agar angka tidak melompat-lompat
-          hr = Math.round(hrRef.current * 0.8 + est.bpm * 0.2);
+          const prev = hrRef.current ?? est.bpm;
+          const hr = Math.round(prev * 0.8 + est.bpm * 0.2);
           hrRef.current = hr;
           hrConfidence = Math.min(1, est.snr / 4);
           hrConfRef.current = hrConfidence;
+          // HRV proxy: variabilitas estimasi BPM terakhir (~ms-equivalent).
+          bpmHistory.current.push(est.bpm);
+          if (bpmHistory.current.length > 20) bpmHistory.current.shift();
         }
       }
     }
 
+    // heartRate hanya valid bila confidence cukup; jika belum → null (N/A).
+    const hrReady = hrRef.current != null && hrConfidence >= 0.25;
+    const heartRate = hrReady ? hrRef.current : null;
+
+    // HRV (proxy) dari sebaran BPM; butuh ≥5 sampel agar bermakna.
+    let hrv = null;
+    if (bpmHistory.current.length >= 5) {
+      const arr = bpmHistory.current;
+      const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+      const variance = arr.reduce((a, b) => a + (b - mean) ** 2, 0) / arr.length;
+      // konversi kasar variabilitas BPM → milidetik-ekuivalen (ilustratif)
+      hrv = Math.round(Math.sqrt(variance) * 8);
+    }
+
     setVitals({
-      heartRate: hr,
+      heartRate,
+      hrv,
       perclos: Number(perclos.toFixed(2)),
       pupilDilation: Number(pupilDilation.toFixed(2)),
       blinkRate,
       ear: Number(ear.toFixed(2)),
+      expression: expr,
+      posture: post.slumpScore,
+      isSlumping: post.isSlumping,
       faceDetected: true,
       hrConfidence: Number(hrConfidence.toFixed(2)),
+      hrReady,
     });
   }, []);
 
@@ -290,6 +374,11 @@ export function useFaceVitals() {
       if (videoRef.current) videoRef.current.srcObject = null;
     } catch {}
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    greenBuf.current = [];
+    bpmHistory.current = [];
+    hrRef.current = null;
+    hrConfRef.current = 0;
+    setVitals(NO_DATA);
     setStatus("idle");
   }, []);
 

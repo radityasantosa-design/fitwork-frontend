@@ -119,6 +119,8 @@ function vitalsBody(v) {
     perclos: v.perclos,
     pupilDilation: v.pupilDilation,
     blinkRate: v.blinkRate,
+    isSlumping: v.isSlumping ? 1 : 0,
+    facialTension: v.expression ? v.expression.tension : undefined,
   });
 }
 
