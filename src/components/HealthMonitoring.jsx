@@ -1,30 +1,101 @@
+import { useState } from "react";
 import { motion } from "motion/react";
-import { Heart, Eye, Zap } from "lucide-react";
+import { Heart, Eye, Zap, Camera as CameraIcon, CameraOff, Loader2 } from "lucide-react";
 import { Card, GaugeRing, StatusPill, TimelineItem } from "./shared";
 import { useHealthData } from "../hooks/useHealthData";
+import { useFaceVitals } from "../hooks/useFaceVitals";
 
 const PERCLOS_THRESHOLD = Number(import.meta.env.VITE_PERCLOS_THRESHOLD) || 0.4;
 
-function FaceMesh() {
-  const points = [
-    [40,35],[60,35],[38,40],[62,40],[42,38],[58,38],
-    [50,50],[48,55],[52,55],
-    [42,65],[50,67],[58,65],
-    [35,45],[65,45],[50,30],[50,70],
-  ];
+/** Kamera nyata + overlay PERCLOS dari MediaPipe FaceMesh. */
+function CameraFeed({ face }) {
+  const { videoRef, canvasRef, vitals, status, start, stop } = face;
+  const active = status === "running" || status === "no-face" || status === "loading";
+
+  const statusLabel = {
+    idle: "Camera off",
+    loading: "Loading model…",
+    running: vitals.faceDetected ? "Tracking" : "Searching face…",
+    "no-face": "No face detected",
+    denied: "Camera denied",
+    error: "Camera error",
+  }[status] || status;
+
   return (
-    <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-      {points.map((p, i) => (
-        <motion.circle key={i} cx={p[0]} cy={p[1]} r="0.6" fill="#1D9E75"
-          animate={{ opacity: [0.4, 1, 0.4] }}
-          transition={{ duration: 2, repeat: Infinity, delay: i * 0.05 }}
+    <Card className="p-5">
+      <div className="flex items-center justify-between mb-3">
+        <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 600 }} className="text-neutral-900 dark:text-white">Camera feed</h3>
+        <span className="inline-flex items-center gap-1.5 text-accent text-xs">
+          <span className={`w-1.5 h-1.5 rounded-full bg-accent ${status === "running" ? "animate-pulse" : "opacity-40"}`} /> rPPG
+        </span>
+      </div>
+
+      <div className="relative aspect-4/3 rounded-xl overflow-hidden bg-neutral-900">
+        {/* Video kamera (di-mirror agar terasa natural) */}
+        <video
+          ref={videoRef}
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover"
+          style={{ transform: "scaleX(-1)" }}
         />
-      ))}
-      {points.slice(0, -2).map((p, i) => {
-        const next = points[(i + 1) % points.length];
-        return <line key={`l${i}`} x1={p[0]} y1={p[1]} x2={next[0]} y2={next[1]} stroke="#1D9E75" strokeWidth="0.15" opacity="0.5" />;
-      })}
-    </svg>
+        {/* Canvas scratch untuk sampling rPPG (tak terlihat) */}
+        <canvas ref={canvasRef} width={640} height={480} className="hidden" />
+
+        {!active && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-linear-to-br from-primary/30 via-transparent to-accent/20">
+            <CameraIcon size={28} className="text-white/70" />
+            <button
+              onClick={start}
+              className="px-4 py-2 rounded-xl bg-accent hover:bg-accent/90 text-white text-sm font-semibold active:scale-95 transition"
+            >
+              Start camera
+            </button>
+            {status === "denied" && <span className="text-danger text-xs">Izin kamera ditolak</span>}
+            {status === "error" && <span className="text-danger text-xs">Gagal memuat model CV</span>}
+          </div>
+        )}
+
+        {status === "loading" && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+            <Loader2 size={24} className="text-white animate-spin" />
+          </div>
+        )}
+
+        <div className="absolute top-3 left-3 flex items-center gap-2">
+          <span className="px-2 py-0.5 rounded-md bg-black/50 text-white text-xs font-mono">
+            {status === "running" ? "640p · live" : "offline"}
+          </span>
+          <span className="px-2 py-0.5 rounded-md bg-black/50 text-white text-xs">{statusLabel}</span>
+        </div>
+
+        {active && (
+          <button
+            onClick={stop}
+            className="absolute top-3 right-3 w-7 h-7 rounded-md bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition"
+            aria-label="Stop camera"
+          >
+            <CameraOff size={14} />
+          </button>
+        )}
+
+        <div className="absolute bottom-3 left-3 right-3">
+          <div className="text-white/70 mb-1.5 flex justify-between text-xs font-mono">
+            <span>PERCLOS</span><span>{vitals.perclos} / {PERCLOS_THRESHOLD}</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-white/20 overflow-hidden">
+            <motion.div
+              className={`h-full ${vitals.perclos > PERCLOS_THRESHOLD ? "bg-danger" : "bg-accent"}`}
+              animate={{ width: `${Math.min((vitals.perclos / PERCLOS_THRESHOLD) * 100, 100)}%` }}
+              transition={{ duration: 0.4 }}
+            />
+          </div>
+        </div>
+      </div>
+      <p className="text-neutral-400 dark:text-neutral-500 mt-3 text-xs leading-relaxed">
+        Facial landmarks tracked locally with MediaPipe. No video leaves your device.
+      </p>
+    </Card>
   );
 }
 
@@ -51,16 +122,25 @@ function buildTimeline({ stressLevel, fatigueScore, vitals, focusScore }, now) {
 }
 
 export function HealthMonitoring() {
-  const { data, isLive } = useHealthData();
-  const { vitals, stressLevel, fatigueScore } = data;
+  const face = useFaceVitals();
+  const camLive = face.status === "running" && face.vitals.faceDetected;
+
+  // Kirim vitals kamera ke backend ML saat kamera aktif; jika tidak, hook
+  // tetap menarik data mock/terakhir agar UI tidak pernah kosong.
+  const { data, isLive, transport } = useHealthData(camLive ? face.vitals : null);
+
+  // Saat kamera live, vitals yang ditampilkan = hasil CV nyata (bukan API).
+  const vitals = camLive
+    ? { ...data.vitals, ...face.vitals }
+    : data.vitals;
+  const { stressLevel, fatigueScore } = data;
 
   const hrStatus = vitals.heartRate > 100 ? "warning" : "normal";
   const pupilPct = Math.round(vitals.pupilDilation * 100);
   const pupilStatus = vitals.pupilDilation > 0.6 ? "warning" : "normal";
   const perclosStatus = vitals.perclos > PERCLOS_THRESHOLD ? "alert" : vitals.perclos > PERCLOS_THRESHOLD * 0.7 ? "warning" : "normal";
-  const perclosWidth = `${Math.min((vitals.perclos / PERCLOS_THRESHOLD) * 100, 100)}%`;
 
-  const events = buildTimeline(data, new Date());
+  const events = buildTimeline({ ...data, vitals }, new Date());
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-5 lg:space-y-6">
@@ -70,7 +150,9 @@ export function HealthMonitoring() {
             Health Monitoring
           </h1>
           <p className="text-neutral-500 dark:text-neutral-400 mt-1" style={{ fontSize: 14 }}>
-            Real-time analysis · {isLive ? "live feed" : "offline (mock)"}
+            {isLive
+              ? `Live feed · ${transport === "signalr" ? "SignalR real-time" : "HTTP polling"}${camLive ? " · camera" : ""}`
+              : "offline (mock)"}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -81,35 +163,10 @@ export function HealthMonitoring() {
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 lg:gap-6">
 
-        {/* Camera feed */}
-        <Card className="p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 600 }} className="text-neutral-900 dark:text-white">Camera feed</h3>
-            <span className="inline-flex items-center gap-1.5 text-accent text-xs">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" /> rPPG
-            </span>
-          </div>
-          <div className="relative aspect-4/3 rounded-xl overflow-hidden bg-neutral-900">
-            <div className="absolute inset-0 bg-linear-to-br from-primary/30 via-transparent to-accent/20" />
-            <FaceMesh />
-            <div className="absolute top-3 left-3">
-              <span className="px-2 py-0.5 rounded-md bg-black/50 text-white text-xs font-mono">1080p · 30fps</span>
-            </div>
-            <div className="absolute bottom-3 left-3 right-3">
-              <div className="text-white/70 mb-1.5 flex justify-between text-xs font-mono">
-                <span>PERCLOS</span><span>{vitals.perclos} / {PERCLOS_THRESHOLD}</span>
-              </div>
-              <div className="h-1.5 rounded-full bg-white/20 overflow-hidden">
-                <motion.div className="h-full bg-accent" initial={{ width: 0 }} animate={{ width: perclosWidth }} transition={{ duration: 1 }} />
-              </div>
-            </div>
-          </div>
-          <p className="text-neutral-400 dark:text-neutral-500 mt-3 text-xs leading-relaxed">
-            Facial landmarks tracked locally. No video leaves your device.
-          </p>
-        </Card>
+        {/* Camera feed — kamera + MediaPipe FaceMesh nyata */}
+        <CameraFeed face={face} />
 
-        {/* Live vitals — dari API */}
+        {/* Live vitals — dari kamera (CV) saat live, atau API */}
         <Card className="p-5">
           <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 600 }} className="text-neutral-900 dark:text-white mb-5">Live vitals</h3>
           <div className="space-y-6">
