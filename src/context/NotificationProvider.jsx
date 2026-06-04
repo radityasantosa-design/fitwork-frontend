@@ -8,10 +8,12 @@ const MAX_ITEMS = 30;
 
 // Pemetaan tipe alert → kunci terjemahan (judul/isi).
 const ALERT_MAP = {
-  break:   { titleKey: "notif.breakTitle",   bodyKey: "notif.breakBody",   tone: "warning" },
-  stress:  { titleKey: "notif.stressTitle",  bodyKey: "notif.stressBody",  tone: "alert" },
-  posture: { titleKey: "notif.postureTitle", bodyKey: "notif.postureBody", tone: "warning" },
-  eye:     { titleKey: "notif.eyeTitle",     bodyKey: "notif.eyeBody",     tone: "warning" },
+  break:       { titleKey: "notif.breakTitle",       bodyKey: "notif.breakBody",       tone: "warning" },
+  stress:      { titleKey: "notif.stressTitle",      bodyKey: "notif.stressBody",      tone: "alert" },
+  posture:     { titleKey: "notif.postureTitle",     bodyKey: "notif.postureBody",     tone: "warning" },
+  eye:         { titleKey: "notif.eyeTitle",         bodyKey: "notif.eyeBody",         tone: "warning" },
+  tension:     { titleKey: "notif.tensionTitle",     bodyKey: "notif.tensionBody",     tone: "warning" },
+  distraction: { titleKey: "notif.distractionTitle", bodyKey: "notif.distractionBody", tone: "warning" },
 };
 
 let _id = 0;

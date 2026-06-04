@@ -1,10 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { motion } from "motion/react";
 import { Heart, Eye, Zap, Camera as CameraIcon, CameraOff, Loader2 } from "lucide-react";
 import { Card, GaugeRing, StatusPill, TimelineItem } from "./shared";
 import { useHealth } from "../context/HealthProvider";
-import { useNotifications } from "../context/NotificationProvider";
-import { useFaceVitals } from "../hooks/useFaceVitals";
+import { useWorkSession } from "../context/WorkSessionProvider";
 import { useT } from "../i18n/LanguageProvider";
 
 const PERCLOS_THRESHOLD = Number(import.meta.env.VITE_PERCLOS_THRESHOLD) || 0.4;
@@ -20,10 +19,23 @@ function MiniStat({ label, value, tone = "ok" }) {
   );
 }
 
-/** Kamera nyata + overlay PERCLOS dari MediaPipe FaceMesh. */
-function CameraFeed({ face, t }) {
-  const { videoRef, canvasRef, vitals, status, start, stop } = face;
-  const active = status === "running" || status === "no-face" || status === "loading";
+/** Kamera nyata + overlay PERCLOS. Stream berasal dari Sesi Kerja global
+ *  (WorkSessionProvider) — kamera tetap jalan walau pindah halaman. */
+function CameraFeed({ ws, t }) {
+  const { status, vitals, start, stop, active, getStream } = ws;
+  const previewRef = useRef(null);
+
+  // Tampilkan stream kamera global (sama dengan widget PiP) di halaman ini.
+  useEffect(() => {
+    const v = previewRef.current;
+    if (!v) return;
+    if (active) {
+      const s = getStream();
+      if (s && v.srcObject !== s) v.srcObject = s;
+    } else {
+      v.srcObject = null;
+    }
+  }, [active, status, getStream]);
 
   const statusLabel = {
     idle: t("health.camOff"),
@@ -32,7 +44,7 @@ function CameraFeed({ face, t }) {
     "no-face": t("health.camNoFace"),
     denied: t("health.camDenied"),
     error: t("health.camError"),
-  }[status] || status;
+  }[status] || (active ? status : t("health.camOff"));
 
   return (
     <Card className="p-5">
@@ -44,8 +56,7 @@ function CameraFeed({ face, t }) {
       </div>
 
       <div className="relative aspect-4/3 rounded-xl overflow-hidden bg-neutral-900">
-        <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: "scaleX(-1)" }} />
-        <canvas ref={canvasRef} width={640} height={480} className="hidden" />
+        <video ref={previewRef} muted playsInline autoPlay className="absolute inset-0 w-full h-full object-cover" style={{ transform: "scaleX(-1)" }} />
 
         {!active && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-linear-to-br from-primary/30 via-transparent to-accent/20">
@@ -53,14 +64,18 @@ function CameraFeed({ face, t }) {
             <button onClick={start} className="px-4 py-2 rounded-xl bg-accent hover:bg-accent/90 text-white text-sm font-semibold active:scale-95 transition">
               {t("health.startCamera")}
             </button>
-            {status === "denied" && <span className="text-danger text-xs">{t("health.permissionDenied")}</span>}
-            {status === "error" && <span className="text-danger text-xs">{t("health.modelError")}</span>}
+            <span className="text-white/60 text-xs text-center px-6 leading-relaxed">{t("work.startCta")}</span>
           </div>
         )}
 
-        {status === "loading" && (
+        {active && status === "loading" && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/40">
             <Loader2 size={24} className="text-white animate-spin" />
+          </div>
+        )}
+        {active && (status === "denied" || status === "error") && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+            <span className="text-danger text-xs">{status === "denied" ? t("health.permissionDenied") : t("health.modelError")}</span>
           </div>
         )}
 
@@ -99,22 +114,10 @@ function CameraFeed({ face, t }) {
 
 export function HealthMonitoring() {
   const { t } = useT();
-  const { data, isLive, transport, setLiveVitals } = useHealth();
-  const { pushAlert } = useNotifications();
-  const face = useFaceVitals();
-  const camLive = face.status === "running" && face.vitals.faceDetected;
-  const fv = face.vitals;
-
-  // Salurkan vitals kamera ke HealthProvider (sumber kebenaran bersama).
-  useEffect(() => {
-    setLiveVitals(camLive ? fv : null);
-    return () => setLiveVitals(null);
-  }, [camLive, fv, setLiveVitals]);
-
-  // Alert postur membungkuk (cooldown ditangani NotificationProvider).
-  useEffect(() => {
-    if (camLive && fv.isSlumping) pushAlert("posture");
-  }, [camLive, fv.isSlumping, pushAlert]);
+  const { data, isLive, transport } = useHealth();
+  const ws = useWorkSession();
+  const camLive = ws.camLive;
+  const fv = ws.vitals;
 
   // Saat kamera live, vitals dari CV adalah sumber kebenaran; null = N/A.
   const live = camLive;
@@ -174,7 +177,7 @@ export function HealthMonitoring() {
       </div>
 
       {/* Banner saat kamera aktif tapi wajah tidak terdeteksi */}
-      {face.status === "no-face" && (
+      {ws.status === "no-face" && (
         <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning flex items-center gap-2">
           <Eye size={16} /> {t("health.noFaceBanner")}
         </div>
@@ -182,8 +185,8 @@ export function HealthMonitoring() {
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 lg:gap-6">
 
-        {/* Camera feed — kamera + MediaPipe FaceMesh nyata */}
-        <CameraFeed face={face} t={t} />
+        {/* Camera feed — stream dari Sesi Kerja global */}
+        <CameraFeed ws={ws} t={t} />
 
         {/* Live vitals */}
         <Card className="p-5">

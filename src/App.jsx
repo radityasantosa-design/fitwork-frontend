@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { LayoutDashboard, HeartPulse, Lightbulb, Eye, ClipboardCheck, Settings as SettingsIcon, Sparkles, Sun, Moon, Menu, X, HelpCircle, LogIn, LogOut } from "lucide-react";
+import { LayoutDashboard, HeartPulse, Lightbulb, Eye, ClipboardCheck, Settings as SettingsIcon, Sparkles, Sun, Moon, Menu, X, HelpCircle, LogIn, LogOut, Play } from "lucide-react";
 import { Logo } from "./components/shared";
 import { Login } from "./components/Login";
 import { Dashboard } from "./components/Dashboard";
@@ -10,10 +10,12 @@ import { EyeTracking } from "./components/EyeTracking";
 import { Assessment } from "./components/Assessment";
 import { Settings } from "./components/Settings";
 import { BreakModal } from "./components/BreakModal";
+import { FocusModal } from "./components/FocusModal";
 import { Onboarding } from "./components/Onboarding";
 import { NotificationBell } from "./components/NotificationBell";
 import { useT, LanguageSwitcher } from "./i18n/LanguageProvider";
 import { useAuth } from "./context/AuthContext";
+import { useWorkSession } from "./context/WorkSessionProvider";
 
 const nav = [
   { id: "dashboard",       icon: LayoutDashboard },
@@ -37,6 +39,7 @@ function Splash() {
 export default function App() {
   const { t } = useT();
   const { isAuthenticated, isConfigured, loading, profile, signOut } = useAuth();
+  const { active: workActive, start: startWork, stop: stopWork, focus, dismissFocus } = useWorkSession();
 
   const [screen, setScreen]                 = useState("dashboard");
   const [dark, setDark]                     = useState(true);
@@ -131,6 +134,22 @@ export default function App() {
                     <HelpCircle size={14} /> {t("common.tour")}
                   </button>
                 )}
+                <button
+                  onClick={workActive ? stopWork : startWork}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all active:scale-95 ${
+                    workActive
+                      ? "bg-danger/10 text-danger hover:bg-danger/15"
+                      : "bg-primary text-white hover:bg-primary-hover"
+                  }`}
+                  title={workActive ? t("work.stopFull") : t("work.start")}
+                >
+                  {workActive ? (
+                    <span className="w-2 h-2 rounded-full bg-danger animate-pulse" />
+                  ) : (
+                    <Play size={14} />
+                  )}
+                  <span className="hidden sm:inline">{workActive ? t("work.stop") : t("work.start")}</span>
+                </button>
                 <LanguageSwitcher />
                 <button
                   onClick={() => setDark(!dark)}
@@ -240,6 +259,14 @@ export default function App() {
       )}
 
       <BreakModal key={breakKey} open={breakOpen} onClose={() => setBreakOpen(false)} />
+
+      {/* Modal "Ayo Fokus" — dipicu otomatis oleh WorkSessionProvider */}
+      <FocusModal
+        open={focus.open}
+        reason={focus.reason}
+        onDismiss={dismissFocus}
+        onTakeBreak={() => { dismissFocus(); openBreak(); }}
+      />
 
       {/* Login modal overlay (mode tamu / Supabase belum dikonfigurasi) */}
       {showLogin && (

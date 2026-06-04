@@ -1,0 +1,187 @@
+/* eslint-disable react-refresh/only-export-components */
+import { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { Loader2, CameraOff } from "lucide-react";
+import { useFaceVitals } from "../hooks/useFaceVitals";
+import { useNotifications } from "./NotificationProvider";
+import { useHealth } from "./HealthProvider";
+import { useT } from "../i18n/LanguageProvider";
+
+/**
+ * WorkSessionProvider — "Sesi Kerja" global.
+ *
+ * Sekali dimulai, kamera + MediaPipe (useFaceVitals) berjalan TERUS di
+ * semua halaman (kamera dipindah ke level provider, bukan per-halaman),
+ * dan ditampilkan sebagai widget mengambang (PiP) di pojok layar.
+ *
+ * Provider memantau sinyal "kurang fokus" dan memunculkan modal "Ayo Fokus":
+ *   - postur membungkuk        (isSlumping bertahan)
+ *   - mata lelah / ngantuk      (PERCLOS di atas ambang bertahan)
+ *   - ekspresi tegang           (facial tension tinggi bertahan)
+ *   - pindah tab kelamaan       (Page Visibility — kembali setelah lama pergi)
+ *
+ * Catatan teknis: browser menjeda pemrosesan kamera saat tab di-background,
+ * jadi deteksi pindah-tab memakai Page Visibility (durasi pergi), bukan kamera.
+ */
+
+const WorkSessionContext = createContext(null);
+
+const PERCLOS_THRESHOLD = Number(import.meta.env.VITE_PERCLOS_THRESHOLD) || 0.4;
+const TENSION_THRESHOLD = 0.55;
+
+// Berapa lama sinyal buruk harus BERTAHAN sebelum memunculkan modal fokus.
+const SLUMP_MS = 6000;
+const EYE_MS = 5000;
+const TENSION_MS = 8000;
+const AWAY_MS = 60000;            // pindah tab > 1 menit dianggap terdistraksi
+const FOCUS_COOLDOWN_MS = 90000;  // jangan munculkan modal fokus lebih sering dari ini
+
+/** Widget kamera mengambang (PiP). Elemen video/canvas SELALU termount
+ *  selama provider hidup agar ref stabil & MediaPipe bisa memprosesnya. */
+function WorkSessionPiP({ videoRef, canvasRef, active, status, vitals, onStop, t }) {
+  const loading = status === "loading";
+  const denied = status === "denied" || status === "error";
+  const tracking = status === "running" && vitals.faceDetected;
+
+  return (
+    <div className={`fixed bottom-4 right-4 z-40 ${active ? "" : "hidden"}`}>
+      <div className="w-44 rounded-2xl overflow-hidden bg-neutral-900 shadow-2xl border border-white/10">
+        <div className="relative aspect-4/3 bg-neutral-900">
+          <video ref={videoRef} muted playsInline autoPlay className="absolute inset-0 w-full h-full object-cover" style={{ transform: "scaleX(-1)" }} />
+          <canvas ref={canvasRef} width={640} height={480} className="hidden" />
+
+          {loading && (
+            <div className="absolute inset-0 grid place-items-center bg-black/50">
+              <Loader2 size={20} className="text-white animate-spin" />
+            </div>
+          )}
+          {denied && (
+            <div className="absolute inset-0 grid place-items-center bg-black/60 px-2 text-center">
+              <span className="text-danger text-[11px] leading-tight">{t("health.permissionDenied")}</span>
+            </div>
+          )}
+
+          <div className="absolute top-1.5 left-1.5 flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-black/55">
+            <span className={`w-1.5 h-1.5 rounded-full ${tracking ? "bg-accent animate-pulse" : "bg-white/40"}`} />
+            <span className="text-white text-[10px] font-medium">{t("work.pip")}</span>
+          </div>
+          <button
+            onClick={onStop}
+            className="absolute top-1.5 right-1.5 w-6 h-6 rounded-md bg-black/55 hover:bg-black/75 text-white grid place-items-center transition"
+            aria-label={t("work.stop")}
+          >
+            <CameraOff size={12} />
+          </button>
+        </div>
+        <div className="px-2.5 py-1.5 flex items-center justify-between text-[10px] text-white/70">
+          <span>{status === "no-face" ? t("health.camNoFace") : t("work.live")}</span>
+          <span className="font-mono">{vitals.perclos != null ? `P ${vitals.perclos}` : "--"}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function WorkSessionProvider({ children }) {
+  const { t } = useT();
+  const face = useFaceVitals();
+  const { pushAlert } = useNotifications();
+  const { setLiveVitals } = useHealth();
+
+  const { vitals, status } = face;
+  const [active, setActive] = useState(false);
+  const [sessionStart, setSessionStart] = useState(null);
+  const [awayCount, setAwayCount] = useState(0);
+  const [focus, setFocus] = useState({ open: false, reason: null });
+
+  const camLive = active && status === "running" && vitals.faceDetected;
+
+  // Salurkan vitals kamera ke HealthProvider (sumber kebenaran skor ML).
+  useEffect(() => {
+    setLiveVitals(camLive ? vitals : null);
+    return () => setLiveVitals(null);
+  }, [camLive, vitals, setLiveVitals]);
+
+  // ── Deteksi kurang fokus (timer "sejak kapan" tiap sinyal) ──
+  const since = useRef({ slump: 0, eye: 0, tension: 0 });
+  const lastFocusFired = useRef(0);
+
+  const fireFocus = useCallback((reason) => {
+    const now = Date.now();
+    if (now - lastFocusFired.current < FOCUS_COOLDOWN_MS) return;
+    lastFocusFired.current = now;
+    setFocus({ open: true, reason });
+  }, []);
+
+  useEffect(() => {
+    if (!camLive) { since.current = { slump: 0, eye: 0, tension: 0 }; return; }
+    const now = Date.now();
+    const check = (key, cond, dur, onFire) => {
+      if (cond) {
+        if (!since.current[key]) since.current[key] = now;
+        else if (now - since.current[key] >= dur) { since.current[key] = now; onFire(); }
+      } else {
+        since.current[key] = 0;
+      }
+    };
+    check("slump", vitals.isSlumping, SLUMP_MS, () => { pushAlert("posture"); fireFocus("posture"); });
+    check("eye", vitals.perclos != null && vitals.perclos > PERCLOS_THRESHOLD, EYE_MS, () => { pushAlert("eye", { v: vitals.perclos }); fireFocus("eye"); });
+    check("tension", vitals.expression != null && vitals.expression.tension > TENSION_THRESHOLD, TENSION_MS, () => { pushAlert("tension"); fireFocus("tension"); });
+  }, [camLive, vitals, pushAlert, fireFocus]);
+
+  // ── Deteksi pindah tab (Page Visibility) ──
+  const awayStart = useRef(0);
+  useEffect(() => {
+    if (!active) return;
+    function onVis() {
+      if (document.hidden) {
+        awayStart.current = Date.now();
+      } else if (awayStart.current) {
+        const away = Date.now() - awayStart.current;
+        awayStart.current = 0;
+        setAwayCount((c) => c + 1);
+        if (away >= AWAY_MS) { pushAlert("distraction"); fireFocus("distraction"); }
+      }
+    }
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [active, pushAlert, fireFocus]);
+
+  const start = useCallback(async () => {
+    setActive(true);
+    setSessionStart(Date.now());
+    setAwayCount(0);
+    lastFocusFired.current = 0;
+    await face.start();
+  }, [face]);
+
+  const stop = useCallback(() => {
+    face.stop();
+    setActive(false);
+    setSessionStart(null);
+    setFocus({ open: false, reason: null });
+    since.current = { slump: 0, eye: 0, tension: 0 };
+  }, [face]);
+
+  const dismissFocus = useCallback(() => setFocus((f) => ({ ...f, open: false })), []);
+  const getStream = useCallback(() => face.videoRef.current?.srcObject || null, [face.videoRef]);
+
+  const value = useMemo(
+    () => ({ active, status, vitals, camLive, sessionStart, awayCount, focus, start, stop, dismissFocus, getStream }),
+    [active, status, vitals, camLive, sessionStart, awayCount, focus, start, stop, dismissFocus, getStream]
+  );
+
+  return (
+    <WorkSessionContext.Provider value={value}>
+      {children}
+      <WorkSessionPiP videoRef={face.videoRef} canvasRef={face.canvasRef} active={active} status={status} vitals={vitals} onStop={stop} t={t} />
+    </WorkSessionContext.Provider>
+  );
+}
+
+export function useWorkSession() {
+  const ctx = useContext(WorkSessionContext);
+  if (!ctx) throw new Error("useWorkSession harus dipakai di dalam <WorkSessionProvider>");
+  return ctx;
+}
+
+export default WorkSessionProvider;
