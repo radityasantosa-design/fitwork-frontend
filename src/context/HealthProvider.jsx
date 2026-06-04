@@ -166,7 +166,8 @@ export function HealthProvider({ children }) {
           try {
             await fetch(`${API_BASE}/messages`, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              // text/plain = "simple request" → hindari preflight CORS (OPTIONS).
+              headers: { "Content-Type": "text/plain" },
               body: vitalsBody(v),
             });
           } catch { /* reconnect otomatis */ }
@@ -192,7 +193,10 @@ export function HealthProvider({ children }) {
         const to = setTimeout(() => controller.abort(), 8000);
         const res = await fetch(API_URL, {
           method: "POST",
-          headers: { Accept: "application/json", "Content-Type": "application/json" },
+          // Content-Type text/plain + hanya header CORS-safelisted → tidak memicu
+          // preflight OPTIONS (yang ditolak backend). Body tetap JSON; backend
+          // membaca via req.get_json() yang tak peduli Content-Type.
+          headers: { Accept: "application/json", "Content-Type": "text/plain" },
           body: vitalsBody(v),
           signal: controller.signal,
         });
