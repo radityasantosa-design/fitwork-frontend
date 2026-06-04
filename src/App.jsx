@@ -44,7 +44,10 @@ export default function App() {
   const { active: workActive, start: startWork, stop: stopWork, focus, dismissFocus } = useWorkSession();
 
   const [screen, setScreen]                 = useState("dashboard");
-  const [dark, setDark]                     = useState(true);
+  const [dark, setDark]                     = useState(() => {
+    const saved = localStorage.getItem("fitwork-dark-mode");
+    return saved ? JSON.parse(saved) : false; // default light mode
+  });
   const [breakOpen, setBreakOpen]           = useState(false);
   const [breakKey, setBreakKey]             = useState(0);
   const [mobileNav, setMobileNav]           = useState(false);
@@ -53,6 +56,7 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
+    localStorage.setItem("fitwork-dark-mode", JSON.stringify(dark));
   }, [dark]);
 
   const openBreak = useCallback(() => { setBreakKey((k) => k + 1); setBreakOpen(true); }, []);

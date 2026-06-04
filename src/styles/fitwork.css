@@ -3,17 +3,20 @@
   /* Core brand colors */
   --color-primary:        #0F6E56;
   --color-accent:         #1D9E75;
-  --color-warning:        #BA7517;
+  --color-warning:        #d97706;
   --color-danger:         #E24B4A;
-  --color-bg-light:       #F8FAF9;
+  --color-bg-light:       #f8faf9;
   --color-bg-dark:        #1A1F1E;
 
   /* Surface & interaction states */
+  --color-surface-light:  #f5f7f6;
   --color-surface-dark:   #222826;
   --color-primary-hover:  #0d5d49;
   --color-primary-active: #0a4a3a;
+  --color-primary-light:  #e8f1ed;
   --color-elevation-dark: #2a3230;
   --color-accent-hover:   #179066;
+  --color-accent-light:   #e8f9f4;
 }
 
 /* ── Text ────────────────────────────────────────── */
