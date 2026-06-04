@@ -35,6 +35,14 @@ const TENSION_MS = 8000;
 const AWAY_MS = 60000;            // pindah tab > 1 menit dianggap terdistraksi
 const FOCUS_COOLDOWN_MS = 90000;  // jangan munculkan modal fokus lebih sering dari ini
 
+// Kunci pesan per alasan — dipakai modal & notifikasi sistem.
+const FOCUS_REASON_KEY = {
+  posture: "focus.reasonPosture",
+  eye: "focus.reasonEye",
+  tension: "focus.reasonTension",
+  distraction: "focus.reasonDistraction",
+};
+
 /** Widget kamera mengambang (PiP). Elemen video/canvas SELALU termount
  *  selama provider hidup agar ref stabil & MediaPipe bisa memprosesnya. */
 function WorkSessionPiP({ videoRef, canvasRef, active, status, vitals, onStop, t }) {
@@ -87,11 +95,17 @@ export function WorkSessionProvider({ children }) {
   const { pushAlert } = useNotifications();
   const { setLiveVitals } = useHealth();
 
+  // Ref agar notifikasi sistem selalu memakai terjemahan terbaru tanpa
+  // memaksa effect deteksi dibuat ulang saat bahasa berganti.
+  const tRef = useRef(t);
+  useEffect(() => { tRef.current = t; }, [t]);
+
   const { vitals, status } = face;
   const [active, setActive] = useState(false);
   const [sessionStart, setSessionStart] = useState(null);
   const [awayCount, setAwayCount] = useState(0);
   const [focus, setFocus] = useState({ open: false, reason: null });
+  const swRegRef = useRef(null);
 
   const camLive = active && status === "running" && vitals.faceDetected;
 
@@ -109,6 +123,31 @@ export function WorkSessionProvider({ children }) {
     const now = Date.now();
     if (now - lastFocusFired.current < FOCUS_COOLDOWN_MS) return;
     lastFocusFired.current = now;
+
+    const tt = tRef.current;
+    const reg = swRegRef.current;
+
+    // UTAMA: popup notifikasi DI LUAR website + tombol "Istirahat"/"Lanjut fokus".
+    // Muncul di pojok layar walau pengguna sedang di tab/aplikasi lain.
+    if (reg && "Notification" in window && Notification.permission === "granted") {
+      try {
+        reg.showNotification(tt("focus.title"), {
+          body: tt(FOCUS_REASON_KEY[reason] || "focus.reasonTension"),
+          tag: "fitwork-focus",
+          renotify: true,
+          requireInteraction: true,
+          icon: "/favicon.svg",
+          badge: "/favicon.svg",
+          actions: [
+            { action: "break", title: tt("focus.takeBreak") },
+            { action: "focus", title: tt("focus.keepFocus") },
+          ],
+        });
+        return;
+      } catch { /* fallback ke modal dalam halaman */ }
+    }
+
+    // FALLBACK: modal dalam halaman (bila notifikasi belum diizinkan/didukung).
     setFocus({ open: true, reason });
   }, []);
 
@@ -151,6 +190,16 @@ export function WorkSessionProvider({ children }) {
     setSessionStart(Date.now());
     setAwayCount(0);
     lastFocusFired.current = 0;
+    // Siapkan notifikasi popup di luar website: minta izin + daftarkan service
+    // worker (klik tombol "Mulai Kerja" = gesture pengguna yang sah).
+    try {
+      if ("Notification" in window && Notification.permission === "default") {
+        await Notification.requestPermission();
+      }
+      if ("serviceWorker" in navigator && !swRegRef.current) {
+        swRegRef.current = await navigator.serviceWorker.register("/sw.js");
+      }
+    } catch { /* abaikan bila tak didukung */ }
     await face.start();
   }, [face]);
 

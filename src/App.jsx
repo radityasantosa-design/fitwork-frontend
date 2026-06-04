@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { LayoutDashboard, HeartPulse, Lightbulb, Eye, ClipboardCheck, Settings as SettingsIcon, Sparkles, Sun, Moon, Menu, X, HelpCircle, LogIn, LogOut, Play } from "lucide-react";
 import { Logo } from "./components/shared";
 import { Login } from "./components/Login";
@@ -53,7 +53,17 @@ export default function App() {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
 
-  const openBreak = () => { setBreakKey((k) => k + 1); setBreakOpen(true); };
+  const openBreak = useCallback(() => { setBreakKey((k) => k + 1); setBreakOpen(true); }, []);
+
+  // Tombol "Istirahat sebentar" pada notifikasi sistem → buka modal istirahat.
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    const onMsg = (e) => {
+      if (e.data && e.data.type === "focus-action" && e.data.action === "break") openBreak();
+    };
+    navigator.serviceWorker.addEventListener("message", onMsg);
+    return () => navigator.serviceWorker.removeEventListener("message", onMsg);
+  }, [openBreak]);
 
   // ── Login gate ────────────────────────────────────────────────
   // Saat Supabase terkonfigurasi, app hanya bisa diakses setelah login.
