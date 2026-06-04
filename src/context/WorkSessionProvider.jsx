@@ -109,11 +109,14 @@ export function WorkSessionProvider({ children }) {
 
   const camLive = active && status === "running" && vitals.faceDetected;
 
-  // Salurkan vitals kamera ke HealthProvider (sumber kebenaran skor ML).
+  // Salurkan vitals kamera + lama sesi NYATA ke HealthProvider (sumber skor ML).
+  // sessionHours dikirim agar backend tak memakai default palsu (5.4 jam).
   useEffect(() => {
-    setLiveVitals(camLive ? vitals : null);
+    if (!camLive) { setLiveVitals(null); return; }
+    const sessionHours = sessionStart ? (Date.now() - sessionStart) / 3600000 : 0;
+    setLiveVitals({ ...vitals, sessionHours: Number(sessionHours.toFixed(3)) });
     return () => setLiveVitals(null);
-  }, [camLive, vitals, setLiveVitals]);
+  }, [camLive, vitals, sessionStart, setLiveVitals]);
 
   // ── Deteksi kurang fokus (timer "sejak kapan" tiap sinyal) ──
   const since = useRef({ slump: 0, eye: 0, tension: 0 });

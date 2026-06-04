@@ -98,6 +98,8 @@ function vitalsBody(v) {
     blinkRate: v.blinkRate,
     isSlumping: v.isSlumping ? 1 : 0,
     facialTension: v.expression ? v.expression.tension : undefined,
+    // Lama sesi kerja nyata (jam) → backend tak memakai default 5.4 lagi.
+    activeWorkHours: v.sessionHours,
   });
 }
 
