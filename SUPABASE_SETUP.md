@@ -64,6 +64,48 @@ create trigger on_auth_user_created
   for each row execute function public.handle_new_user();
 ```
 
+## 4b. Tabel riwayat harian (untuk halaman Riwayat / Dashboard 7 hari)
+Masih di **SQL Editor** → **New query** → tempel semua → **Run**:
+
+```sql
+-- Statistik harian: 1 baris per user per tanggal (akumulasi sum + jumlah sampel)
+create table if not exists public.daily_stats (
+  user_id      uuid    not null references auth.users(id) on delete cascade,
+  day          date    not null,
+  focus_sum    numeric not null default 0,
+  stress_sum   numeric not null default 0,
+  fatigue_sum  numeric not null default 0,
+  samples      integer not null default 0,
+  work_seconds integer not null default 0,
+  updated_at   timestamptz not null default now(),
+  primary key (user_id, day)
+);
+
+alter table public.daily_stats enable row level security;
+
+drop policy if exists "Users manage own daily stats" on public.daily_stats;
+create policy "Users manage own daily stats" on public.daily_stats
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Tambah satu sampel skor ke baris hari ini secara atomik (rata-rata = sum/samples)
+create or replace function public.add_health_sample(
+  p_day date, p_focus numeric, p_stress numeric, p_fatigue numeric, p_seconds int
+) returns void language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.daily_stats (user_id, day, focus_sum, stress_sum, fatigue_sum, samples, work_seconds, updated_at)
+  values (auth.uid(), p_day, p_focus, p_stress, p_fatigue, 1, p_seconds, now())
+  on conflict (user_id, day) do update set
+    focus_sum    = daily_stats.focus_sum    + excluded.focus_sum,
+    stress_sum   = daily_stats.stress_sum   + excluded.stress_sum,
+    fatigue_sum  = daily_stats.fatigue_sum  + excluded.fatigue_sum,
+    samples      = daily_stats.samples      + 1,
+    work_seconds = daily_stats.work_seconds + excluded.work_seconds,
+    updated_at   = now();
+end; $$;
+```
+
+Tanpa langkah ini, halaman **Riwayat** menampilkan "belum ada riwayat" dan kartu 7 hari di Dashboard kosong (app tetap jalan normal).
+
 ## 5. Atur konfirmasi email (untuk demo)
 Default Supabase mewajibkan **konfirmasi email** saat daftar. Untuk demo cepat tanpa cek email:
 - **Authentication → Sign In / Providers → Email** → matikan **Confirm email** → **Save**.

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { LayoutDashboard, HeartPulse, Lightbulb, Eye, ClipboardCheck, Settings as SettingsIcon, Sparkles, Sun, Moon, Menu, X, HelpCircle, LogIn, LogOut, Play } from "lucide-react";
+import { LayoutDashboard, HeartPulse, Lightbulb, Eye, ClipboardCheck, Settings as SettingsIcon, Sparkles, Sun, Moon, Menu, X, HelpCircle, LogIn, LogOut, Play, History as HistoryIcon } from "lucide-react";
 import { Logo } from "./components/shared";
 import { Login } from "./components/Login";
 import { Dashboard } from "./components/Dashboard";
@@ -9,6 +9,7 @@ import { AIAdvisor } from "./components/AIAdvisor";
 import { EyeTracking } from "./components/EyeTracking";
 import { Assessment } from "./components/Assessment";
 import { Settings } from "./components/Settings";
+import { History } from "./components/History";
 import { BreakModal } from "./components/BreakModal";
 import { FocusModal } from "./components/FocusModal";
 import { Onboarding } from "./components/Onboarding";
@@ -20,6 +21,7 @@ import { useWorkSession } from "./context/WorkSessionProvider";
 const nav = [
   { id: "dashboard",       icon: LayoutDashboard },
   { id: "health",          icon: HeartPulse },
+  { id: "history",         icon: HistoryIcon },
   { id: "assessment",      icon: ClipboardCheck },
   { id: "recommendations", icon: Lightbulb },
   { id: "advisor",         icon: Sparkles },
@@ -253,8 +255,9 @@ export default function App() {
 
           {/* Page content */}
           <main className="flex-1">
-            {screen === "dashboard"       && <Dashboard onTriggerBreak={openBreak} />}
+            {screen === "dashboard"       && <Dashboard onTriggerBreak={openBreak} onViewHistory={() => setScreen("history")} />}
             {screen === "health"          && <HealthMonitoring />}
+            {screen === "history"         && <History />}
             {screen === "assessment"      && <Assessment />}
             {screen === "recommendations" && <Recommendations />}
             {screen === "advisor"         && <AIAdvisor onTriggerBreak={openBreak} />}

@@ -1,7 +1,8 @@
-import { Activity, Brain, Clock, Coffee, Sparkles, Lightbulb, TrendingUp, AlertTriangle, WifiOff } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { Activity, Brain, Clock, Coffee, Sparkles, Lightbulb, TrendingUp, AlertTriangle, WifiOff, ChevronRight } from "lucide-react";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { Card, MetricCard, GaugeRing, StatusPill } from "./shared";
 import { useHealth } from "../context/HealthProvider";
+import { useDailyStats } from "../context/DailyStatsProvider";
 import { useAuth } from "../context/AuthContext";
 import { useT } from "../i18n/LanguageProvider";
 
@@ -10,11 +11,20 @@ function fatigueStatus(v) { return v == null ? "inactive" : v > 60 ? "alert" : v
 function focusStatus(v) { return v == null ? "inactive" : v >= 70 ? "normal" : v >= 50 ? "warning" : "alert"; }
 const r = (v) => (v == null ? "--" : Math.round(v));
 
-export function Dashboard({ onTriggerBreak }) {
-  const { t } = useT();
+export function Dashboard({ onTriggerBreak, onViewHistory }) {
+  const { t, lang } = useT();
   const { profile, isAuthenticated } = useAuth();
   const { data, history, isLive } = useHealth();
+  const { history: daily } = useDailyStats();
   const { focusScore, stressLevel, fatigueScore, vitals, sessionInfo, breakWarning } = data;
+
+  const last7 = daily
+    .filter((d) => d.samples > 0)
+    .slice(-7)
+    .map((d) => ({
+      label: new Date(d.day + "T00:00:00").toLocaleDateString(lang === "id" ? "id-ID" : "en-US", { day: "2-digit", month: "short" }),
+      focus: d.focus,
+    }));
 
   const hasData = focusScore != null;
   const REASON_LABEL = {
@@ -188,6 +198,37 @@ export function Dashboard({ onTriggerBreak }) {
           )}
         </Card>
       </div>
+
+      {/* Riwayat 7 hari (tersimpan di Supabase, reset per hari) */}
+      <Card className="p-5 lg:p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 17, fontWeight: 600 }} className="text-neutral-900 dark:text-white">{t("history.card7Title")}</h3>
+            <p className="text-neutral-400 dark:text-neutral-500 mt-0.5" style={{ fontSize: 13 }}>{t("history.card7Sub")}</p>
+          </div>
+          <button onClick={onViewHistory} className="inline-flex items-center gap-1 text-primary dark:text-accent hover:underline text-sm font-medium">
+            {t("history.viewAll")} <ChevronRight size={15} />
+          </button>
+        </div>
+        <div className="h-44">
+          {last7.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-neutral-400 dark:text-neutral-500 gap-2">
+              <WifiOff size={20} className="opacity-50" />
+              <span className="text-sm text-center max-w-xs">{t("history.card7Empty")}</span>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={last7} margin={{ left: -20, top: 8, right: 8 }}>
+                <CartesianGrid stroke="currentColor" strokeOpacity={0.07} vertical={false} />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} tickLine={false} axisLine={false} domain={[0, 100]} />
+                <Tooltip contentStyle={{ background: "var(--color-surface-dark, #fff)", border: "1px solid rgba(0,0,0,0.08)", borderRadius: 12, fontSize: 12 }} itemStyle={{ color: "#6b7280" }} cursor={{ fill: "currentColor", fillOpacity: 0.05 }} />
+                <Bar dataKey="focus" fill="#0F6E56" radius={[6, 6, 0, 0]} maxBarSize={36} isAnimationActive={false} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </Card>
 
       {/* Live session bar — vitals dari shared state */}
       <Card className="p-3.5 px-5">
