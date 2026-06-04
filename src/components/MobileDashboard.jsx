@@ -2,17 +2,29 @@
 import { LineChart, Line, ResponsiveContainer } from "recharts";
 import { Card, GaugeRing, StatusPill, Avatar, Logo } from "./shared";
 import { useHealthData } from "../hooks/useHealthData";
+import { useDailyStats } from "../context/DailyStatsProvider";
 
 export function MobileDashboard({ onTriggerBreak }) {
+  // Real-time data untuk GaugeRing dan insights
   const { data, history, isLive } = useHealthData();
   const { focusScore, stressLevel, fatigueScore, sessionInfo, breakWarning } = data;
   const focus = Math.round(focusScore);
+  
+  // Accumulated daily stats untuk cards
+  const { today: todayStat } = useDailyStats();
+  
+  // Jika ada daily stats, gunakan; jika tidak, fallback ke real-time
+  const displayFocus = todayStat?.focus ?? focus;
+  const displayStress = todayStat?.stress ?? Math.round(stressLevel);
+  const displayFatigue = todayStat?.fatigue ?? Math.round(fatigueScore);
+  const displayWorkHours = todayStat?.workHours ?? sessionInfo.activeWorkHours ?? 0;
+  
   const trend = history.map((h) => ({ v: h.productivity }));
   const cards = [
-    { l: "Focus", v: String(focus), u: "/100", s: focus >= 70 ? "normal" : "warning", i: <Brain size={16} /> },
-    { l: "Stress", v: String(Math.round(stressLevel)), u: "%", s: stressLevel > 40 ? "warning" : "normal", i: <Activity size={16} /> },
-    { l: "Active", v: `${sessionInfo.activeWorkHours}h`, s: "normal", i: <Clock size={16} /> },
-    { l: "Fatigue", v: String(Math.round(fatigueScore)), u: "%", s: fatigueScore > 35 ? "warning" : "normal", i: <Coffee size={16} /> },
+    { l: "Focus", v: String(displayFocus), u: "/100", s: displayFocus >= 70 ? "normal" : "warning", i: <Brain size={16} /> },
+    { l: "Stress", v: String(displayStress), u: "%", s: displayStress > 40 ? "warning" : "normal", i: <Activity size={16} /> },
+    { l: "Active", v: `${(displayWorkHours || 0).toFixed(1)}h`, s: "normal", i: <Clock size={16} /> },
+    { l: "Fatigue", v: String(displayFatigue), u: "%", s: displayFatigue > 35 ? "warning" : "normal", i: <Coffee size={16} /> },
   ];
   const insightText = breakWarning?.triggered
     ? `Break suggested (${breakWarning.recommendedMinutes} min). Stress ${Math.round(stressLevel)}%, fatigue ${Math.round(fatigueScore)}%.`

@@ -15,8 +15,14 @@ export function Dashboard({ onTriggerBreak, onViewHistory }) {
   const { t, lang } = useT();
   const { profile, isAuthenticated } = useAuth();
   const { data, history, isLive } = useHealth();
-  const { history: daily } = useDailyStats();
+  const { today: todayStat, history: daily } = useDailyStats();
   const { focusScore, stressLevel, fatigueScore, vitals, sessionInfo, breakWarning } = data;
+
+  // Accumulated daily stats untuk metric cards
+  const displayFocus = todayStat?.focus ?? focusScore;
+  const displayStress = todayStat?.stress ?? stressLevel;
+  const displayFatigue = todayStat?.fatigue ?? fatigueScore;
+  const displayWorkHours = todayStat?.workHours ?? sessionInfo.activeWorkHours;
 
   const last7 = daily
     .filter((d) => d.samples > 0)
@@ -34,7 +40,7 @@ export function Dashboard({ onTriggerBreak, onViewHistory }) {
     cognitive_overload: t("advisor.reasonOverload"),
   };
 
-  // Insight hanya dibangun saat ada pembacaan nyata.
+  // Insight hanya dibangun saat ada pembacaan nyata (real-time).
   const insights = hasData
     ? [
         {
@@ -55,7 +61,7 @@ export function Dashboard({ onTriggerBreak, onViewHistory }) {
           icon: <TrendingUp size={16} />,
           title: t("dashboard.insightBlocksTitle", { n: sessionInfo.deepWorkBlocks ?? 0 }),
           body: t("dashboard.insightBlocks", {
-            hours: sessionInfo.activeWorkHours ?? 0,
+            hours: displayWorkHours ?? 0,
             compliance: sessionInfo.breakCompliance ?? 0,
           }),
         },
@@ -119,12 +125,12 @@ export function Dashboard({ onTriggerBreak, onViewHistory }) {
         </Card>
       )}
 
-      {/* Metric cards — dari shared health state (idle = --) */}
+      {/* Metric cards — dari accumulated daily stats (fallback ke real-time saat idle) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
-        <MetricCard label={t("dashboard.metricFocus")} value={r(focusScore)} unit="/100" delta={hasData ? (focusScore >= 70 ? t("dashboard.deltaInFlow") : t("dashboard.deltaBelowPeak")) : t("common.noData")} status={focusStatus(focusScore)} icon={<Brain size={18} />} />
-        <MetricCard label={t("dashboard.metricStress")} value={r(stressLevel)} unit="%" delta={hasData ? (stressLevel > 40 ? t("dashboard.deltaModerate") : t("dashboard.deltaHealthy")) : t("common.noData")} status={stressStatus(stressLevel)} icon={<Activity size={18} />} />
-        <MetricCard label={t("dashboard.metricFatigue")} value={r(fatigueScore)} unit="%" delta={hasData ? (fatigueScore > 35 ? t("dashboard.deltaWatch") : t("dashboard.deltaLowFatigue")) : t("common.noData")} status={fatigueStatus(fatigueScore)} icon={<Coffee size={18} />} />
-        <MetricCard label={t("dashboard.metricHours")} value={sessionInfo.activeWorkHours != null ? `${sessionInfo.activeWorkHours}h` : "--"} delta={sessionInfo.deepWorkBlocks != null ? t("dashboard.deepBlocks", { n: sessionInfo.deepWorkBlocks }) : t("common.noData")} status={sessionInfo.activeWorkHours != null ? "normal" : "inactive"} icon={<Clock size={18} />} />
+        <MetricCard label={t("dashboard.metricFocus")} value={r(displayFocus)} unit="/100" delta={hasData ? (displayFocus >= 70 ? t("dashboard.deltaInFlow") : t("dashboard.deltaBelowPeak")) : t("common.noData")} status={focusStatus(displayFocus)} icon={<Brain size={18} />} />
+        <MetricCard label={t("dashboard.metricStress")} value={r(displayStress)} unit="%" delta={hasData ? (displayStress > 40 ? t("dashboard.deltaModerate") : t("dashboard.deltaHealthy")) : t("common.noData")} status={stressStatus(displayStress)} icon={<Activity size={18} />} />
+        <MetricCard label={t("dashboard.metricFatigue")} value={r(displayFatigue)} unit="%" delta={hasData ? (displayFatigue > 35 ? t("dashboard.deltaWatch") : t("dashboard.deltaLowFatigue")) : t("common.noData")} status={fatigueStatus(displayFatigue)} icon={<Coffee size={18} />} />
+        <MetricCard label={t("dashboard.metricHours")} value={displayWorkHours != null ? `${(displayWorkHours || 0).toFixed(1)}h` : "--"} delta={sessionInfo.deepWorkBlocks != null ? t("dashboard.deepBlocks", { n: sessionInfo.deepWorkBlocks }) : t("common.noData")} status={displayWorkHours != null ? "normal" : "inactive"} icon={<Clock size={18} />} />
       </div>
 
       {/* Chart + Insights */}
