@@ -4,6 +4,8 @@ import { Loader2, CameraOff } from "lucide-react";
 import { useFaceVitals } from "../hooks/useFaceVitals";
 import { useNotifications } from "./NotificationProvider";
 import { useHealth } from "./HealthProvider";
+import { useDailyStats } from "./DailyStatsProvider";
+import { recordBreakRecommended } from "../lib/breakStats";
 import { useT } from "../i18n/LanguageProvider";
 
 /**
@@ -94,6 +96,7 @@ export function WorkSessionProvider({ children }) {
   const face = useFaceVitals();
   const { pushAlert } = useNotifications();
   const { setLiveVitals } = useHealth();
+  const { today: dailyToday } = useDailyStats();
 
   // Ref agar notifikasi sistem selalu memakai terjemahan terbaru tanpa
   // memaksa effect deteksi dibuat ulang saat bahasa berganti.
