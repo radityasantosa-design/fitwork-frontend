@@ -1,35 +1,17 @@
 ﻿import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowRight, X } from "lucide-react";
+import { useT } from "../i18n/LanguageProvider";
 
 const steps = [
-  {
-    title: "Your daily focus score",
-    body: "We calculate this from your eye-tracking data, heart-rate variability, and active work hours. Aim for 80+.",
-    target: { top: "100px", left: "32px", width: "320px" },
-    arrow: "top",
-  },
-  {
-    title: "Live wellness metrics",
-    body: "Tap any card to drill into the underlying signals. Cards turn amber when a metric drifts out of range.",
-    target: { top: "260px", left: "32px", width: "calc(100% - 64px)" },
-    arrow: "top",
-  },
-  {
-    title: "AI insights, every 30 min",
-    body: "Personalized nudges based on patterns from the last hour. Tap to dismiss or schedule.",
-    target: { top: "440px", right: "32px", width: "340px" },
-    arrow: "right",
-  },
-  {
-    title: "Live session bar",
-    body: "Always shows what FitWork is sensing. A green dot means data is flowing; red means a check is needed.",
-    target: { bottom: "32px", left: "32px", width: "calc(100% - 64px)" },
-    arrow: "bottom",
-  },
+  { titleKey: "onboarding.step1Title", bodyKey: "onboarding.step1Body", target: { top: "100px", left: "32px", width: "320px" }, arrow: "top" },
+  { titleKey: "onboarding.step2Title", bodyKey: "onboarding.step2Body", target: { top: "260px", left: "32px", width: "calc(100% - 64px)" }, arrow: "top" },
+  { titleKey: "onboarding.step3Title", bodyKey: "onboarding.step3Body", target: { top: "440px", right: "32px", width: "340px" }, arrow: "right" },
+  { titleKey: "onboarding.step4Title", bodyKey: "onboarding.step4Body", target: { bottom: "32px", left: "32px", width: "calc(100% - 64px)" }, arrow: "bottom" },
 ];
 
 export function Onboarding({ onClose }) {
+  const { t } = useT();
   const [step, setStep] = useState(0);
   const s = steps[step];
 
@@ -60,9 +42,9 @@ export function Onboarding({ onClose }) {
             </button>
           </div>
           <h4 style={{ fontFamily: "'Sora', sans-serif", fontSize: 17, fontWeight: 600 }} className="text-neutral-900 dark:text-white mt-3">
-            {s.title}
+            {t(s.titleKey)}
           </h4>
-          <p className="text-neutral-500 mt-1.5" style={{ fontSize: 13.5, lineHeight: 1.55 }}>{s.body}</p>
+          <p className="text-neutral-500 mt-1.5" style={{ fontSize: 13.5, lineHeight: 1.55 }}>{t(s.bodyKey)}</p>
           <div className="flex items-center justify-between mt-4">
             <div className="flex gap-1.5">
               {steps.map((_, i) => (
@@ -71,14 +53,14 @@ export function Onboarding({ onClose }) {
             </div>
             <div className="flex items-center gap-2">
               <button onClick={onClose} className="px-3 py-1.5 rounded-lg text-neutral-500 hover:text-neutral-800 dark:hover:text-white" style={{ fontSize: 12.5 }}>
-                Skip
+                {t("onboarding.skip")}
               </button>
               <button
                 onClick={() => (step === steps.length - 1 ? onClose() : setStep(step + 1))}
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary-hover active:bg-primary-active text-white transition"
                 style={{ fontSize: 12.5, fontWeight: 600 }}
               >
-                {step === steps.length - 1 ? "Got it" : "Next"} {step !== steps.length - 1 && <ArrowRight size={12} />}
+                {step === steps.length - 1 ? t("onboarding.gotIt") : t("onboarding.next")} {step !== steps.length - 1 && <ArrowRight size={12} />}
               </button>
             </div>
           </div>

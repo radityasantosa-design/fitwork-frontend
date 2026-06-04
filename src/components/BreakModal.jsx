@@ -2,14 +2,16 @@
 import { motion, AnimatePresence } from "motion/react";
 import { Clock, Eye, Activity, Footprints, X } from "lucide-react";
 import { PrimaryButton, GhostButton } from "./shared";
+import { useT } from "../i18n/LanguageProvider";
 
 const options = [
-  { icon: <Eye size={20} />, title: "2-min Eye Rest", desc: "Look 20 ft away, blink slowly" },
-  { icon: <Activity size={20} />, title: "5-min Stretch", desc: "Neck, shoulders, wrists" },
-  { icon: <Footprints size={20} />, title: "10-min Walk", desc: "Step away from your desk" },
+  { icon: <Eye size={20} />, titleKey: "breakModal.optEyeTitle", descKey: "breakModal.optEyeDesc" },
+  { icon: <Activity size={20} />, titleKey: "breakModal.optStretchTitle", descKey: "breakModal.optStretchDesc" },
+  { icon: <Footprints size={20} />, titleKey: "breakModal.optWalkTitle", descKey: "breakModal.optWalkDesc" },
 ];
 
 export function BreakModal({ open, onClose }) {
+  const { t } = useT();
   const [selected, setSelected] = useState(0);
   const [seconds, setSeconds] = useState(300);
 
@@ -58,10 +60,10 @@ export function BreakModal({ open, onClose }) {
                 <Clock size={40} />
               </motion.div>
               <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 26, fontWeight: 600 }} className="text-neutral-900 dark:text-white mt-5">
-                Time for a Break
+                {t("breakModal.title")}
               </h2>
               <p className="text-neutral-500 mt-2 max-w-sm" style={{ fontSize: 14, lineHeight: 1.6 }}>
-                You've been working for <span style={{ fontWeight: 600 }} className="text-neutral-700 dark:text-neutral-200">52 minutes</span>. A short break improves your focus by up to <span className="text-accent" style={{ fontWeight: 600 }}>30%</span>.
+                {t("breakModal.body")}
               </p>
             </div>
 
@@ -75,15 +77,15 @@ export function BreakModal({ open, onClose }) {
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${selected === i ? "bg-primary text-white" : "bg-accent/10 text-primary dark:text-accent"}`}>
                     {o.icon}
                   </div>
-                  <div className="text-neutral-900 dark:text-white" style={{ fontSize: 14, fontWeight: 600 }}>{o.title}</div>
-                  <div className="text-neutral-500 mt-0.5" style={{ fontSize: 12, lineHeight: 1.5 }}>{o.desc}</div>
+                  <div className="text-neutral-900 dark:text-white" style={{ fontSize: 14, fontWeight: 600 }}>{t(o.titleKey)}</div>
+                  <div className="text-neutral-500 mt-0.5" style={{ fontSize: 12, lineHeight: 1.5 }}>{t(o.descKey)}</div>
                 </button>
               ))}
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 mt-7">
-              <PrimaryButton onClick={onClose} className="flex-1">Start Break Now</PrimaryButton>
-              <GhostButton onClick={onClose} className="flex-1">Remind Me in 5 min</GhostButton>
+              <PrimaryButton onClick={onClose} className="flex-1">{t("breakModal.startNow")}</PrimaryButton>
+              <GhostButton onClick={onClose} className="flex-1">{t("breakModal.remind5")}</GhostButton>
             </div>
           </motion.div>
         </motion.div>

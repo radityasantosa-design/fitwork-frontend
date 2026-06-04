@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect } from "react";
 import { motion } from "motion/react";
 import { Heart, Eye, Zap, Camera as CameraIcon, CameraOff, Loader2 } from "lucide-react";
 import { Card, GaugeRing, StatusPill, TimelineItem } from "./shared";
-import { useHealthData } from "../hooks/useHealthData";
+import { useHealth } from "../context/HealthProvider";
+import { useNotifications } from "../context/NotificationProvider";
 import { useFaceVitals } from "../hooks/useFaceVitals";
+import { useT } from "../i18n/LanguageProvider";
 
 const PERCLOS_THRESHOLD = Number(import.meta.env.VITE_PERCLOS_THRESHOLD) || 0.4;
 
@@ -19,51 +21,40 @@ function MiniStat({ label, value, tone = "ok" }) {
 }
 
 /** Kamera nyata + overlay PERCLOS dari MediaPipe FaceMesh. */
-function CameraFeed({ face }) {
+function CameraFeed({ face, t }) {
   const { videoRef, canvasRef, vitals, status, start, stop } = face;
   const active = status === "running" || status === "no-face" || status === "loading";
 
   const statusLabel = {
-    idle: "Camera off",
-    loading: "Loading model…",
-    running: vitals.faceDetected ? "Tracking" : "Searching face…",
-    "no-face": "No face detected",
-    denied: "Camera denied",
-    error: "Camera error",
+    idle: t("health.camOff"),
+    loading: t("health.camLoading"),
+    running: vitals.faceDetected ? t("health.camTracking") : t("health.camSearching"),
+    "no-face": t("health.camNoFace"),
+    denied: t("health.camDenied"),
+    error: t("health.camError"),
   }[status] || status;
 
   return (
     <Card className="p-5">
       <div className="flex items-center justify-between mb-3">
-        <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 600 }} className="text-neutral-900 dark:text-white">Camera feed</h3>
+        <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 600 }} className="text-neutral-900 dark:text-white">{t("health.cameraFeed")}</h3>
         <span className="inline-flex items-center gap-1.5 text-accent text-xs">
           <span className={`w-1.5 h-1.5 rounded-full bg-accent ${status === "running" ? "animate-pulse" : "opacity-40"}`} /> rPPG
         </span>
       </div>
 
       <div className="relative aspect-4/3 rounded-xl overflow-hidden bg-neutral-900">
-        {/* Video kamera (di-mirror agar terasa natural) */}
-        <video
-          ref={videoRef}
-          muted
-          playsInline
-          className="absolute inset-0 w-full h-full object-cover"
-          style={{ transform: "scaleX(-1)" }}
-        />
-        {/* Canvas scratch untuk sampling rPPG (tak terlihat) */}
+        <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" style={{ transform: "scaleX(-1)" }} />
         <canvas ref={canvasRef} width={640} height={480} className="hidden" />
 
         {!active && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-linear-to-br from-primary/30 via-transparent to-accent/20">
             <CameraIcon size={28} className="text-white/70" />
-            <button
-              onClick={start}
-              className="px-4 py-2 rounded-xl bg-accent hover:bg-accent/90 text-white text-sm font-semibold active:scale-95 transition"
-            >
-              Start camera
+            <button onClick={start} className="px-4 py-2 rounded-xl bg-accent hover:bg-accent/90 text-white text-sm font-semibold active:scale-95 transition">
+              {t("health.startCamera")}
             </button>
-            {status === "denied" && <span className="text-danger text-xs">Izin kamera ditolak</span>}
-            {status === "error" && <span className="text-danger text-xs">Gagal memuat model CV</span>}
+            {status === "denied" && <span className="text-danger text-xs">{t("health.permissionDenied")}</span>}
+            {status === "error" && <span className="text-danger text-xs">{t("health.modelError")}</span>}
           </div>
         )}
 
@@ -81,137 +72,141 @@ function CameraFeed({ face }) {
         </div>
 
         {active && (
-          <button
-            onClick={stop}
-            className="absolute top-3 right-3 w-7 h-7 rounded-md bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition"
-            aria-label="Stop camera"
-          >
+          <button onClick={stop} className="absolute top-3 right-3 w-7 h-7 rounded-md bg-black/50 hover:bg-black/70 text-white flex items-center justify-center transition" aria-label={t("health.stopCamera")}>
             <CameraOff size={14} />
           </button>
         )}
 
         <div className="absolute bottom-3 left-3 right-3">
           <div className="text-white/70 mb-1.5 flex justify-between text-xs font-mono">
-            <span>PERCLOS</span><span>{vitals.perclos} / {PERCLOS_THRESHOLD}</span>
+            <span>PERCLOS</span><span>{vitals.perclos ?? "--"} / {PERCLOS_THRESHOLD}</span>
           </div>
           <div className="h-1.5 rounded-full bg-white/20 overflow-hidden">
             <motion.div
               className={`h-full ${vitals.perclos > PERCLOS_THRESHOLD ? "bg-danger" : "bg-accent"}`}
-              animate={{ width: `${Math.min((vitals.perclos / PERCLOS_THRESHOLD) * 100, 100)}%` }}
+              animate={{ width: `${Math.min(((vitals.perclos || 0) / PERCLOS_THRESHOLD) * 100, 100)}%` }}
               transition={{ duration: 0.4 }}
             />
           </div>
         </div>
       </div>
       <p className="text-neutral-400 dark:text-neutral-500 mt-3 text-xs leading-relaxed">
-        Facial landmarks tracked locally with MediaPipe. No video leaves your device.
+        {t("health.privacyNote")}
       </p>
     </Card>
   );
 }
 
-// Bangun timeline kontekstual dari pembacaan terkini (bukan data statis)
-function buildTimeline({ stressLevel, fatigueScore, vitals, focusScore }, now) {
-  const t = (offsetMin) => {
-    const d = new Date(now.getTime() - offsetMin * 60000);
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  };
-  const items = [];
-  if (stressLevel > 65) items.push({ time: t(0), text: `Stress spike detected — index at ${Math.round(stressLevel)}%`, type: "critical" });
-  else if (stressLevel > 40) items.push({ time: t(0), text: `Stress index rising — now ${Math.round(stressLevel)}%`, type: "warning" });
-  else items.push({ time: t(0), text: `Stress index stable at ${Math.round(stressLevel)}%`, type: "info" });
-
-  if (vitals.perclos > PERCLOS_THRESHOLD) items.push({ time: t(5), text: `Eye strain warning — PERCLOS ${vitals.perclos}`, type: "warning" });
-  else items.push({ time: t(5), text: `Blink rate normal — PERCLOS ${vitals.perclos}`, type: "info" });
-
-  if (vitals.pupilDilation > 0.6) items.push({ time: t(12), text: "Pupil dilation increased — cognitive load high", type: "warning" });
-  if (fatigueScore > 60) items.push({ time: t(18), text: `Fatigue elevated — score ${Math.round(fatigueScore)}%`, type: "critical" });
-  else items.push({ time: t(18), text: `Fatigue under control — ${Math.round(fatigueScore)}%`, type: "info" });
-
-  items.push({ time: t(25), text: `Focus session sustained — ${Math.round(focusScore)}/100`, type: "info" });
-  return items;
-}
-
 export function HealthMonitoring() {
+  const { t } = useT();
+  const { data, isLive, transport, setLiveVitals } = useHealth();
+  const { pushAlert } = useNotifications();
   const face = useFaceVitals();
   const camLive = face.status === "running" && face.vitals.faceDetected;
   const fv = face.vitals;
 
-  // Kirim vitals kamera (incl. isSlumping) ke backend ML saat kamera aktif.
-  const { data, isLive, transport } = useHealthData(camLive ? fv : null);
+  // Salurkan vitals kamera ke HealthProvider (sumber kebenaran bersama).
+  useEffect(() => {
+    setLiveVitals(camLive ? fv : null);
+    return () => setLiveVitals(null);
+  }, [camLive, fv, setLiveVitals]);
 
-  // Saat kamera live, vitals dari CV adalah sumber kebenaran. Nilai null
-  // (belum/tidak terdeteksi) ditampilkan sebagai N/A — TIDAK diisi default.
+  // Alert postur membungkuk (cooldown ditangani NotificationProvider).
+  useEffect(() => {
+    if (camLive && fv.isSlumping) pushAlert("posture");
+  }, [camLive, fv.isSlumping, pushAlert]);
+
+  // Saat kamera live, vitals dari CV adalah sumber kebenaran; null = N/A.
   const live = camLive;
   const heartRate = live ? fv.heartRate : data.vitals.heartRate;
   const perclos = live ? fv.perclos : data.vitals.perclos;
   const pupilDilation = live ? fv.pupilDilation : data.vitals.pupilDilation;
-  const { stressLevel, fatigueScore } = data;
+  const { stressLevel, fatigueScore, focusScore } = data;
+  const hasScores = stressLevel != null;
 
-  // Status gauge (abaikan saat null)
   const hrStatus = heartRate == null ? "normal" : heartRate > 100 ? "warning" : "normal";
   const pupilPct = pupilDilation == null ? null : Math.round(pupilDilation * 100);
   const pupilStatus = pupilDilation == null ? "normal" : pupilDilation > 0.6 ? "warning" : "normal";
   const perclosStatus = perclos == null ? "normal" : perclos > PERCLOS_THRESHOLD ? "alert" : perclos > PERCLOS_THRESHOLD * 0.7 ? "warning" : "normal";
 
-  const vitals = { heartRate, perclos, pupilDilation };
-  const events = buildTimeline({ ...data, vitals: { ...data.vitals } }, new Date());
+  // Lini masa dibangun dari pembacaan nyata; idle = kosong.
+  const events = [];
+  if (hasScores) {
+    const now = new Date();
+    const tm = (m) => new Date(now.getTime() - m * 60000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    if (stressLevel > 65) events.push({ time: tm(0), text: t("health.tlStressSpike", { v: Math.round(stressLevel) }), type: "critical" });
+    else if (stressLevel > 40) events.push({ time: tm(0), text: t("health.tlStressRising", { v: Math.round(stressLevel) }), type: "warning" });
+    else events.push({ time: tm(0), text: t("health.tlStressStable", { v: Math.round(stressLevel) }), type: "info" });
+
+    if (perclos != null) {
+      if (perclos > PERCLOS_THRESHOLD) events.push({ time: tm(5), text: t("health.tlEyeStrain", { v: perclos }), type: "warning" });
+      else events.push({ time: tm(5), text: t("health.tlBlinkNormal", { v: perclos }), type: "info" });
+    }
+    if (pupilDilation != null && pupilDilation > 0.6) events.push({ time: tm(12), text: t("health.tlPupil"), type: "warning" });
+    if (fatigueScore != null) {
+      if (fatigueScore > 60) events.push({ time: tm(18), text: t("health.tlFatigueHigh", { v: Math.round(fatigueScore) }), type: "critical" });
+      else events.push({ time: tm(18), text: t("health.tlFatigueOk", { v: Math.round(fatigueScore) }), type: "info" });
+    }
+    if (focusScore != null) events.push({ time: tm(25), text: t("health.tlFocus", { v: Math.round(focusScore) }), type: "info" });
+  }
+
+  const transportLabel = transport === "signalr" ? t("health.transportSignalr") : t("health.transportPolling");
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-5 lg:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: "clamp(20px,4vw,28px)", fontWeight: 600 }} className="text-neutral-900 dark:text-white">
-            Health Monitoring
+            {t("health.title")}
           </h1>
           <p className="text-neutral-500 dark:text-neutral-400 mt-1" style={{ fontSize: 14 }}>
             {isLive
-              ? `Live feed · ${transport === "signalr" ? "SignalR real-time" : "HTTP polling"}${camLive ? " · camera" : ""}`
-              : "offline (mock)"}
+              ? t("health.subLive", { transport: transportLabel, cam: camLive ? t("health.cameraSuffix") : "" })
+              : t("health.subIdle")}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <StatusPill status={stressLevel > 65 ? "alert" : "normal"} label={stressLevel > 65 ? "High stress" : "Normal"} />
-          {perclos != null && perclos > PERCLOS_THRESHOLD && <StatusPill status="warning" label="Caution: eye strain" />}
-          {fv.isSlumping && <StatusPill status="warning" label="Slumping posture" />}
-          {fv.expression && fv.expression.tension > 0.5 && <StatusPill status="warning" label="Facial tension" />}
+          {hasScores && <StatusPill status={stressLevel > 65 ? "alert" : "normal"} label={stressLevel > 65 ? t("status.highStress") : t("status.normal")} />}
+          {perclos != null && perclos > PERCLOS_THRESHOLD && <StatusPill status="warning" label={t("status.eyeStrain")} />}
+          {fv.isSlumping && <StatusPill status="warning" label={t("status.slumping")} />}
+          {fv.expression && fv.expression.tension > 0.5 && <StatusPill status="warning" label={t("status.facialTension")} />}
         </div>
       </div>
 
       {/* Banner saat kamera aktif tapi wajah tidak terdeteksi */}
       {face.status === "no-face" && (
         <div className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning flex items-center gap-2">
-          <Eye size={16} /> Wajah tidak terdeteksi — posisikan wajah di depan kamera. Vitals ditandai N/A sampai terbaca.
+          <Eye size={16} /> {t("health.noFaceBanner")}
         </div>
       )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 lg:gap-6">
 
         {/* Camera feed — kamera + MediaPipe FaceMesh nyata */}
-        <CameraFeed face={face} />
+        <CameraFeed face={face} t={t} />
 
-        {/* Live vitals — dari kamera (CV) saat live, atau API */}
+        {/* Live vitals */}
         <Card className="p-5">
-          <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 600 }} className="text-neutral-900 dark:text-white mb-5">Live vitals</h3>
+          <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 600 }} className="text-neutral-900 dark:text-white mb-5">{t("health.liveVitals")}</h3>
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-danger/10 text-danger flex items-center justify-center"><Heart size={18} /></div>
                 <div>
-                  <div className="text-neutral-600 dark:text-neutral-400 text-sm">Heart Rate (rPPG)</div>
+                  <div className="text-neutral-600 dark:text-neutral-400 text-sm">{t("health.heartRate")}</div>
                   <div className="text-neutral-400 text-xs">
-                    {live && !fv.hrReady ? "Calibrating rPPG…" : `HRV ${fv.hrv != null ? fv.hrv + " ms" : "--"}`}
+                    {live && !fv.hrReady ? t("health.calibrating") : `HRV ${fv.hrv != null ? fv.hrv + " ms" : "--"}`}
                   </div>
                 </div>
               </div>
-              <GaugeRing value={heartRate} max={140} size={88} unit="bpm" status={hrStatus} />
+              <GaugeRing value={heartRate} max={140} size={88} unit={t("common.bpm")} status={hrStatus} />
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center"><Eye size={18} /></div>
                 <div>
-                  <div className="text-neutral-600 dark:text-neutral-400 text-sm">Pupil Dilation</div>
-                  <div className="text-neutral-400 text-xs">Cognitive load index</div>
+                  <div className="text-neutral-600 dark:text-neutral-400 text-sm">{t("health.pupil")}</div>
+                  <div className="text-neutral-400 text-xs">{t("health.pupilSub")}</div>
                 </div>
               </div>
               <GaugeRing value={pupilPct} size={88} unit="%" status={pupilStatus} />
@@ -220,23 +215,22 @@ export function HealthMonitoring() {
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-warning/10 text-warning flex items-center justify-center"><Zap size={18} /></div>
                 <div>
-                  <div className="text-neutral-600 dark:text-neutral-400 text-sm">PERCLOS</div>
-                  <div className="text-neutral-400 text-xs">Eye closure ratio</div>
+                  <div className="text-neutral-600 dark:text-neutral-400 text-sm">{t("health.perclos")}</div>
+                  <div className="text-neutral-400 text-xs">{t("health.perclosSub")}</div>
                 </div>
               </div>
               <GaugeRing value={perclos} max={PERCLOS_THRESHOLD} size={88} status={perclosStatus} />
             </div>
 
-            {/* FER (ekspresi) & postur — sinyal CV tambahan */}
             <div className="grid grid-cols-2 gap-3 pt-1">
               <MiniStat
-                label="Facial tension"
+                label={t("health.facialTension")}
                 value={fv.expression ? `${Math.round(fv.expression.tension * 100)}%` : "--"}
                 tone={fv.expression && fv.expression.tension > 0.5 ? "warn" : "ok"}
               />
               <MiniStat
-                label="Posture"
-                value={fv.posture != null ? (fv.isSlumping ? "Slumping" : "Upright") : "--"}
+                label={t("health.posture")}
+                value={fv.posture != null ? (fv.isSlumping ? t("health.postureSlumping") : t("health.postureUpright")) : "--"}
                 tone={fv.isSlumping ? "warn" : "ok"}
               />
             </div>
@@ -245,12 +239,18 @@ export function HealthMonitoring() {
 
         {/* Timeline */}
         <Card className="p-5">
-          <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 600 }} className="text-neutral-900 dark:text-white mb-3">Timeline</h3>
+          <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 600 }} className="text-neutral-900 dark:text-white mb-3">{t("health.timeline")}</h3>
           <div className="overflow-y-auto max-h-96 pr-1">
-            {events.map((e, i) => <TimelineItem key={i} {...e} />)}
+            {events.length === 0 ? (
+              <div className="text-sm text-neutral-400 dark:text-neutral-500 py-8 text-center">{t("health.timelineEmpty")}</div>
+            ) : (
+              events.map((e, i) => <TimelineItem key={i} {...e} />)
+            )}
           </div>
         </Card>
       </div>
     </div>
   );
 }
+
+export default HealthMonitoring;

@@ -1,22 +1,31 @@
 import { useState } from "react";
-import { User, Bell, ShieldCheck, Plug, HelpCircle, Camera, Eye, Building2 } from "lucide-react";
-import { Card, Toggle } from "./shared";
-
-const sections = [
-  { id: "account",       label: "Account",        icon: <User size={15} /> },
-  { id: "notifications", label: "Notifications",  icon: <Bell size={15} /> },
-  { id: "privacy",       label: "Privacy & Data", icon: <ShieldCheck size={15} /> },
-  { id: "integrations",  label: "Integrations",   icon: <Plug size={15} /> },
-  { id: "help",          label: "Help",            icon: <HelpCircle size={15} /> },
-];
+import { User, Bell, ShieldCheck, Plug, HelpCircle, Camera, Eye, Building2, Languages, Loader2, Check } from "lucide-react";
+import { Card, Toggle, PrimaryButton } from "./shared";
+import { useT } from "../i18n/LanguageProvider";
+import { useAuth } from "../context/AuthContext";
 
 export function Settings() {
+  const { t, lang, setLang } = useT();
+  const { profile, isAuthenticated, updateProfile } = useAuth();
+
   const [active, setActive] = useState("privacy");
   const [camera, setCamera] = useState(true);
   const [share,  setShare]  = useState(false);
   const [hr,     setHr]     = useState(true);
   const [push,   setPush]   = useState(true);
   const [email,  setEmail]  = useState(false);
+
+  const sections = [
+    { id: "account",       label: t("settings.account"),       icon: <User size={15} /> },
+    { id: "notifications", label: t("settings.notifications"),  icon: <Bell size={15} /> },
+    { id: "privacy",       label: t("settings.privacy"),        icon: <ShieldCheck size={15} /> },
+    { id: "language",      label: t("settings.language"),       icon: <Languages size={15} /> },
+    { id: "integrations",  label: t("settings.integrations"),   icon: <Plug size={15} /> },
+    { id: "help",          label: t("settings.help"),           icon: <HelpCircle size={15} /> },
+  ];
+
+  const displayName = isAuthenticated && profile ? profile.fullName : t("dashboard.greetingGuest");
+  const initials = isAuthenticated && profile ? profile.initials : "FW";
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-5 lg:space-y-6">
@@ -25,13 +34,16 @@ export function Settings() {
       <Card className="p-5 lg:p-6">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-linear-to-br from-primary to-accent flex items-center justify-center text-white shrink-0" style={{ fontFamily: "'Sora', sans-serif", fontSize: 20, fontWeight: 700 }}>
-            RS
+            {initials}
           </div>
           <div>
-            <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 20, fontWeight: 600 }} className="text-neutral-900 dark:text-white">Raditya Santosa</h2>
-            <p className="text-neutral-500 dark:text-neutral-400 text-sm mt-0.5">
-              Senior Product Designer · <span className="inline-flex items-center gap-1"><Building2 size={11} /> Lumen Labs</span>
-            </p>
+            <h2 style={{ fontFamily: "'Sora', sans-serif", fontSize: 20, fontWeight: 600 }} className="text-neutral-900 dark:text-white">{displayName}</h2>
+            {profile?.email && (
+              <p className="text-neutral-500 dark:text-neutral-400 text-sm mt-0.5">
+                {profile.jobTitle || profile.email}
+                {profile.company && <span className="inline-flex items-center gap-1"> · <Building2 size={11} /> {profile.company}</span>}
+              </p>
+            )}
           </div>
         </div>
       </Card>
@@ -59,46 +71,65 @@ export function Settings() {
         <Card className="p-5 lg:p-6">
           {active === "privacy" && (
             <div className="space-y-5">
-              <SectionHeader title="Privacy & Data" desc="You control what FitWork sees, stores, and shares." />
-              <SettingsRow icon={<Camera size={15} />} title="Camera access"      desc="Required for eye tracking and rPPG vitals."                         on={camera} onChange={setCamera} />
-              <SettingsRow icon={<ShieldCheck size={15} />} title="Health data sharing" desc="Send anonymized aggregates for product research."              on={share}  onChange={setShare} />
-              <SettingsRow icon={<Eye size={15} />}    title="HR visibility"       desc="Allow your manager to see weekly wellness summaries."               on={hr}     onChange={setHr} />
+              <SectionHeader title={t("settings.privacyTitle")} desc={t("settings.privacyDesc")} />
+              <SettingsRow icon={<Camera size={15} />} title={t("settings.cameraAccess")} desc={t("settings.cameraAccessDesc")} on={camera} onChange={setCamera} />
+              <SettingsRow icon={<ShieldCheck size={15} />} title={t("settings.healthSharing")} desc={t("settings.healthSharingDesc")} on={share} onChange={setShare} />
+              <SettingsRow icon={<Eye size={15} />} title={t("settings.hrVisibility")} desc={t("settings.hrVisibilityDesc")} on={hr} onChange={setHr} />
               <div className="rounded-xl p-3.5 bg-accent/8 border border-accent/20 text-primary dark:text-accent text-sm leading-relaxed">
-                Data is processed on-device by default. Network sync uses end-to-end encryption.
+                {t("settings.privacyNote")}
               </div>
             </div>
           )}
+
+          {active === "language" && (
+            <div className="space-y-5">
+              <SectionHeader title={t("settings.language")} desc={t("settings.languageDesc")} />
+              <div className="grid grid-cols-2 gap-3 max-w-sm">
+                {[{ id: "id", label: "Bahasa Indonesia", flag: "🇮🇩" }, { id: "en", label: "English", flag: "🇬🇧" }].map((l) => (
+                  <button
+                    key={l.id}
+                    onClick={() => setLang(l.id)}
+                    className={`flex items-center gap-2.5 p-4 rounded-2xl border text-sm font-medium transition ${
+                      lang === l.id
+                        ? "border-primary bg-accent/8 ring-2 ring-accent/20 text-primary dark:text-accent"
+                        : "border-neutral-200 dark:border-white/10 text-neutral-600 dark:text-neutral-300 hover:border-accent/40"
+                    }`}
+                  >
+                    <span className="text-lg">{l.flag}</span> {l.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {active === "notifications" && (
             <div className="space-y-5">
-              <SectionHeader title="Notifications" desc="Choose how you'd like to be reminded." />
-              <SettingsRow icon={<Bell size={15} />} title="Push notifications"  desc="Break, posture, and stress alerts."     on={push}  onChange={setPush} />
-              <SettingsRow icon={<Bell size={15} />} title="Daily email summary" desc="Sent at 6 PM each weekday."             on={email} onChange={setEmail} />
+              <SectionHeader title={t("settings.notifTitle")} desc={t("settings.notifDesc")} />
+              <SettingsRow icon={<Bell size={15} />} title={t("settings.pushNotif")} desc={t("settings.pushNotifDesc")} on={push} onChange={setPush} />
+              <SettingsRow icon={<Bell size={15} />} title={t("settings.emailSummary")} desc={t("settings.emailSummaryDesc")} on={email} onChange={setEmail} />
             </div>
           )}
+
           {active === "integrations" && (
             <div className="space-y-5">
-              <SectionHeader title="Integrations" desc="Connect FitWork to your work tools." />
+              <SectionHeader title={t("settings.integrationsTitle")} desc={t("settings.integrationsDesc")} />
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <IntegrationCard name="Slack"            desc="Auto-DND during deep work" color="#4A154B" />
-                <IntegrationCard name="Google Calendar"  desc="Sync focus blocks"         color="#4285F4" />
-                <IntegrationCard name="Microsoft Teams"  desc="Status auto-update"        color="#5059C9" />
+                <IntegrationCard name="Slack"            desc={t("settings.slackDesc")}    color="#4A154B" connect={t("settings.connect")} />
+                <IntegrationCard name="Google Calendar"  desc={t("settings.calendarDesc")} color="#4285F4" connect={t("settings.connect")} />
+                <IntegrationCard name="Microsoft Teams"  desc={t("settings.teamsDesc")}    color="#5059C9" connect={t("settings.connect")} />
               </div>
             </div>
           )}
+
           {active === "account" && (
-            <div className="space-y-5">
-              <SectionHeader title="Account" desc="Manage your personal information." />
-              <Field label="Full name"  value="Raditya Santosa" />
-              <Field label="Email"      value="raditya.santosa@fitwork.io" />
-              <Field label="Job title"  value="Senior Product Designer" />
-              <Field label="Company"    value="Lumen Labs" />
-            </div>
+            <AccountForm t={t} profile={profile} updateProfile={updateProfile} />
           )}
+
           {active === "help" && (
             <div className="space-y-3">
-              <SectionHeader title="Help & Support" desc="Visit our knowledge base or chat with the wellness coach." />
+              <SectionHeader title={t("settings.helpTitle")} desc={t("settings.helpDesc")} />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
-                {["Knowledge Base", "Contact Support", "Video Tutorials", "Release Notes"].map((item) => (
+                {[t("settings.kb"), t("settings.contact"), t("settings.tutorials"), t("settings.releaseNotes")].map((item) => (
                   <button key={item} className="p-4 rounded-xl border border-neutral-200 dark:border-white/10 text-left text-sm text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-white/5 hover:border-accent/40 transition">
                     {item} →
                   </button>
@@ -136,7 +167,7 @@ function SettingsRow({ icon, title, desc, on, onChange }) {
   );
 }
 
-function IntegrationCard({ name, desc, color }) {
+function IntegrationCard({ name, desc, color, connect }) {
   return (
     <div className="p-4 rounded-2xl border border-neutral-200 dark:border-white/10 hover:border-accent/40 transition">
       <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-bold" style={{ background: color }}>
@@ -144,19 +175,60 @@ function IntegrationCard({ name, desc, color }) {
       </div>
       <div className="mt-3 text-neutral-800 dark:text-white font-semibold text-sm">{name}</div>
       <div className="text-neutral-500 dark:text-neutral-400 mt-0.5 text-xs">{desc}</div>
-      <button className="mt-3 w-full py-1.5 rounded-lg border border-accent/40 text-primary dark:text-accent hover:bg-accent/8 text-xs font-semibold transition">Connect</button>
+      <button className="mt-3 w-full py-1.5 rounded-lg border border-accent/40 text-primary dark:text-accent hover:bg-accent/8 text-xs font-semibold transition">{connect}</button>
     </div>
   );
 }
 
-function Field({ label, value }) {
+function Field({ label, value, onChange, disabled }) {
   return (
     <div>
       <label className="text-neutral-500 dark:text-neutral-400 text-sm">{label}</label>
       <input
-        defaultValue={value}
-        className="mt-1.5 w-full px-3 py-2.5 rounded-xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/5 text-neutral-900 dark:text-white text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition"
+        value={value}
+        onChange={onChange ? (e) => onChange(e.target.value) : undefined}
+        disabled={disabled}
+        className="mt-1.5 w-full px-3 py-2.5 rounded-xl border border-neutral-200 dark:border-white/10 bg-white dark:bg-white/5 text-neutral-900 dark:text-white text-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition disabled:opacity-60"
       />
     </div>
   );
 }
+
+/** Form akun: edit nama/jabatan/perusahaan → simpan ke tabel `profiles`. */
+function AccountForm({ t, profile, updateProfile }) {
+  const [fullName, setFullName] = useState(profile?.fullName || "");
+  const [jobTitle, setJobTitle] = useState(profile?.jobTitle || "");
+  const [company, setCompany]   = useState(profile?.company || "");
+  const [busy, setBusy]   = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function save() {
+    setBusy(true); setSaved(false); setError(null);
+    const { error } = await updateProfile({ full_name: fullName, job_title: jobTitle, company });
+    setBusy(false);
+    if (error) setError(error.message);
+    else { setSaved(true); setTimeout(() => setSaved(false), 2500); }
+  }
+
+  return (
+    <div className="space-y-5">
+      <SectionHeader title={t("settings.accountTitle")} desc={t("settings.accountDesc")} />
+      <Field label={t("settings.fullName")} value={fullName} onChange={setFullName} />
+      <Field label={t("settings.email")} value={profile?.email || ""} disabled />
+      <Field label={t("settings.jobTitle")} value={jobTitle} onChange={setJobTitle} />
+      <Field label={t("settings.company")} value={company} onChange={setCompany} />
+      {error && <div className="text-danger text-sm">{error}</div>}
+      <div className="flex items-center gap-3">
+        <PrimaryButton onClick={busy ? undefined : save} className={busy ? "opacity-60 pointer-events-none" : ""}>
+          <span className="inline-flex items-center gap-1.5 text-sm">
+            {busy ? <Loader2 size={14} className="animate-spin" /> : saved ? <Check size={14} /> : null}
+            {saved ? t("settings.saved") : t("settings.save")}
+          </span>
+        </PrimaryButton>
+      </div>
+    </div>
+  );
+}
+
+export default Settings;

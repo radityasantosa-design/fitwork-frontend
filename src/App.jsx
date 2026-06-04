@@ -1,39 +1,62 @@
 import { useEffect, useState } from "react";
-import { LayoutDashboard, HeartPulse, Lightbulb, Eye, ClipboardCheck, Settings as SettingsIcon, Bell, Sun, Moon, Menu, X, HelpCircle, LogIn } from "lucide-react";
+import { LayoutDashboard, HeartPulse, Lightbulb, Eye, ClipboardCheck, Settings as SettingsIcon, Sparkles, Sun, Moon, Menu, X, HelpCircle, LogIn, LogOut } from "lucide-react";
 import { Logo } from "./components/shared";
 import { Login } from "./components/Login";
 import { Dashboard } from "./components/Dashboard";
 import { HealthMonitoring } from "./components/HealthMonitoring";
 import { Recommendations } from "./components/Recommendations";
+import { AIAdvisor } from "./components/AIAdvisor";
 import { EyeTracking } from "./components/EyeTracking";
 import { Assessment } from "./components/Assessment";
 import { Settings } from "./components/Settings";
 import { BreakModal } from "./components/BreakModal";
 import { Onboarding } from "./components/Onboarding";
+import { NotificationBell } from "./components/NotificationBell";
+import { useT, LanguageSwitcher } from "./i18n/LanguageProvider";
+import { useAuth } from "./context/AuthContext";
 
 const nav = [
-  { id: "dashboard",       label: "Dashboard",       icon: LayoutDashboard },
-  { id: "health",          label: "Health Monitor",  icon: HeartPulse },
-  { id: "assessment",      label: "Assessment",      icon: ClipboardCheck },
-  { id: "recommendations", label: "Recommendations", icon: Lightbulb },
-  { id: "eye",             label: "Eye & Gesture",   icon: Eye },
-  { id: "settings",        label: "Settings",        icon: SettingsIcon },
+  { id: "dashboard",       icon: LayoutDashboard },
+  { id: "health",          icon: HeartPulse },
+  { id: "assessment",      icon: ClipboardCheck },
+  { id: "recommendations", icon: Lightbulb },
+  { id: "advisor",         icon: Sparkles },
+  { id: "eye",             icon: Eye },
+  { id: "settings",        icon: SettingsIcon },
 ];
 
+/** Layar loading saat sesi auth sedang dipulihkan. */
+function Splash() {
+  return (
+    <div className="min-h-screen w-full flex items-center justify-center bg-neutral-50 dark:bg-bg-dark">
+      <div className="animate-pulse"><Logo size={36} /></div>
+    </div>
+  );
+}
+
 export default function App() {
-  const [screen, setScreen]               = useState("dashboard");
-  const [dark, setDark]                   = useState(false);
-  const [breakOpen, setBreakOpen]         = useState(false);
-  const [breakKey, setBreakKey]           = useState(0);
-  const [mobileNav, setMobileNav]         = useState(false);
+  const { t } = useT();
+  const { isAuthenticated, isConfigured, loading, profile, signOut } = useAuth();
+
+  const [screen, setScreen]                 = useState("dashboard");
+  const [dark, setDark]                     = useState(false);
+  const [breakOpen, setBreakOpen]           = useState(false);
+  const [breakKey, setBreakKey]             = useState(0);
+  const [mobileNav, setMobileNav]           = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(true);
-  const [showLogin, setShowLogin]         = useState(false);
+  const [showLogin, setShowLogin]           = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
   }, [dark]);
 
   const openBreak = () => { setBreakKey((k) => k + 1); setBreakOpen(true); };
+
+  // ── Login gate ────────────────────────────────────────────────
+  // Saat Supabase terkonfigurasi, app hanya bisa diakses setelah login.
+  // Bila belum dikonfigurasi, app tetap bisa dibuka (mode tamu) agar dev jalan.
+  if (loading) return <Splash />;
+  if (isConfigured && !isAuthenticated) return <Login />;
 
   return (
     <div className="min-h-screen w-full bg-neutral-50 dark:bg-bg-dark text-neutral-900 dark:text-white transition-colors duration-200" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -61,7 +84,7 @@ export default function App() {
                   style={{ fontSize: 14 }}
                 >
                   <Icon size={18} strokeWidth={active ? 2 : 1.75} />
-                  {n.label}
+                  {t(`nav.${n.id}`)}
                 </button>
               );
             })}
@@ -69,9 +92,9 @@ export default function App() {
 
           <div className="p-3 border-t border-neutral-100 dark:border-white/5">
             <div className="rounded-2xl p-3.5 bg-linear-to-br from-primary to-accent text-white">
-              <div style={{ fontSize: 13, fontWeight: 600 }}>Wellness coach</div>
-              <p className="mt-1 text-white/80" style={{ fontSize: 12, lineHeight: 1.5 }}>Want a 1:1 weekly check-in? Pair FitWork with a coach.</p>
-              <button className="mt-3 px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 active:scale-95 text-white transition" style={{ fontSize: 12, fontWeight: 600 }}>Learn more</button>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{t("common.coachTitle")}</div>
+              <p className="mt-1 text-white/80" style={{ fontSize: 12, lineHeight: 1.5 }}>{t("common.coachBody")}</p>
+              <button className="mt-3 px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 active:scale-95 text-white transition" style={{ fontSize: 12, fontWeight: 600 }}>{t("common.learnMore")}</button>
             </div>
           </div>
         </aside>
@@ -88,13 +111,13 @@ export default function App() {
                 <button
                   className="lg:hidden p-2 rounded-lg text-neutral-500 hover:bg-neutral-100 dark:hover:bg-white/5 hover:text-neutral-800 dark:hover:text-white active:scale-95 transition"
                   onClick={() => setMobileNav(!mobileNav)}
-                  aria-label="Menu"
+                  aria-label={t("common.menu")}
                 >
                   {mobileNav ? <X size={20} /> : <Menu size={20} />}
                 </button>
                 <div className="lg:hidden"><Logo /></div>
                 <h2 className="hidden lg:block text-neutral-700 dark:text-neutral-200" style={{ fontFamily: "'Sora', sans-serif", fontSize: 15, fontWeight: 600 }}>
-                  {nav.find((n) => n.id === screen)?.label}
+                  {t(`nav.${screen}`)}
                 </h2>
               </div>
 
@@ -105,9 +128,10 @@ export default function App() {
                     onClick={() => setShowOnboarding(true)}
                     className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-primary dark:text-accent hover:bg-primary/10 dark:hover:bg-accent/10 transition text-sm font-medium"
                   >
-                    <HelpCircle size={14} /> Tour
+                    <HelpCircle size={14} /> {t("common.tour")}
                   </button>
                 )}
+                <LanguageSwitcher />
                 <button
                   onClick={() => setDark(!dark)}
                   className="w-9 h-9 rounded-lg text-neutral-500 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/10 hover:text-neutral-800 dark:hover:text-white flex items-center justify-center transition"
@@ -115,17 +139,34 @@ export default function App() {
                 >
                   {dark ? <Sun size={17} /> : <Moon size={17} />}
                 </button>
-                <button className="relative w-9 h-9 rounded-lg text-neutral-500 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/10 hover:text-neutral-800 dark:hover:text-white flex items-center justify-center transition">
-                  <Bell size={17} />
-                  <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-danger ring-2 ring-white dark:ring-surface-dark" />
-                </button>
-                <button
-                  onClick={() => setShowLogin(true)}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary hover:bg-primary-hover active:bg-primary-active text-white text-sm font-semibold transition-all active:scale-95 ml-1"
-                >
-                  <LogIn size={14} />
-                  <span className="hidden sm:inline">Login</span>
-                </button>
+                <NotificationBell />
+
+                {isAuthenticated ? (
+                  <div className="flex items-center gap-2 ml-1">
+                    <div className="hidden sm:flex items-center gap-2 pl-1">
+                      <div className="w-8 h-8 rounded-full bg-linear-to-br from-primary to-accent flex items-center justify-center text-white text-xs font-bold">
+                        {profile?.initials || "U"}
+                      </div>
+                      <span className="text-sm font-medium text-neutral-700 dark:text-neutral-200 max-w-[120px] truncate">{profile?.fullName}</span>
+                    </div>
+                    <button
+                      onClick={signOut}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-neutral-500 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/10 hover:text-danger text-sm font-medium transition active:scale-95"
+                      title={t("common.logout")}
+                    >
+                      <LogOut size={15} />
+                      <span className="hidden sm:inline">{t("common.logout")}</span>
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowLogin(true)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary hover:bg-primary-hover active:bg-primary-active text-white text-sm font-semibold transition-all active:scale-95 ml-1"
+                  >
+                    <LogIn size={14} />
+                    <span className="hidden sm:inline">{t("common.login")}</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -133,12 +174,10 @@ export default function App() {
 
           {/* Mobile nav drawer — slide-in panel + backdrop */}
           <div className={`lg:hidden fixed inset-0 z-50 ${mobileNav ? "" : "pointer-events-none"}`}>
-            {/* Backdrop */}
             <div
               onClick={() => setMobileNav(false)}
               className={`absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300 ${mobileNav ? "opacity-100" : "opacity-0"}`}
             />
-            {/* Panel */}
             <aside
               className={`absolute top-0 left-0 h-full w-72 max-w-[82%] bg-white dark:bg-surface-dark border-r border-neutral-200 dark:border-white/5 shadow-2xl flex flex-col transition-transform duration-300 ease-out ${mobileNav ? "translate-x-0" : "-translate-x-full"}`}
             >
@@ -147,7 +186,7 @@ export default function App() {
                 <button
                   onClick={() => setMobileNav(false)}
                   className="w-9 h-9 rounded-lg text-neutral-500 hover:bg-neutral-100 dark:hover:bg-white/5 hover:text-neutral-800 dark:hover:text-white flex items-center justify-center active:scale-95 transition"
-                  aria-label="Tutup menu"
+                  aria-label={t("common.close")}
                 >
                   <X size={18} />
                 </button>
@@ -168,7 +207,7 @@ export default function App() {
                         }`}
                       style={{ fontSize: 14 }}
                     >
-                      <Icon size={18} strokeWidth={active ? 2 : 1.75} /> {n.label}
+                      <Icon size={18} strokeWidth={active ? 2 : 1.75} /> {t(`nav.${n.id}`)}
                     </button>
                   );
                 })}
@@ -176,8 +215,8 @@ export default function App() {
 
               <div className="p-3 border-t border-neutral-100 dark:border-white/5">
                 <div className="rounded-2xl p-3.5 bg-linear-to-br from-primary to-accent text-white">
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>Wellness coach</div>
-                  <p className="mt-1 text-white/80" style={{ fontSize: 12, lineHeight: 1.5 }}>Pair FitWork with a 1:1 weekly check-in.</p>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{t("common.coachTitle")}</div>
+                  <p className="mt-1 text-white/80" style={{ fontSize: 12, lineHeight: 1.5 }}>{t("common.coachBodyShort")}</p>
                 </div>
               </div>
             </aside>
@@ -189,6 +228,7 @@ export default function App() {
             {screen === "health"          && <HealthMonitoring />}
             {screen === "assessment"      && <Assessment />}
             {screen === "recommendations" && <Recommendations />}
+            {screen === "advisor"         && <AIAdvisor onTriggerBreak={openBreak} />}
             {screen === "eye"             && <EyeTracking />}
             {screen === "settings"        && <Settings />}
           </main>
@@ -201,13 +241,13 @@ export default function App() {
 
       <BreakModal key={breakKey} open={breakOpen} onClose={() => setBreakOpen(false)} />
 
-      {/* Login modal overlay */}
+      {/* Login modal overlay (mode tamu / Supabase belum dikonfigurasi) */}
       {showLogin && (
         <div className="fixed inset-0 z-100">
           <button
             onClick={() => setShowLogin(false)}
             className="absolute top-4 right-4 z-10 w-9 h-9 rounded-xl bg-black/20 hover:bg-black/30 backdrop-blur flex items-center justify-center text-white transition"
-            aria-label="Tutup"
+            aria-label={t("common.close")}
           >
             <X size={18} />
           </button>
