@@ -39,7 +39,7 @@ export default function App() {
   const { isAuthenticated, isConfigured, loading, profile, signOut } = useAuth();
 
   const [screen, setScreen]                 = useState("dashboard");
-  const [dark, setDark]                     = useState(false);
+  const [dark, setDark]                     = useState(true);
   const [breakOpen, setBreakOpen]           = useState(false);
   const [breakKey, setBreakKey]             = useState(0);
   const [mobileNav, setMobileNav]           = useState(false);
