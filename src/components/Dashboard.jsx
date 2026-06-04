@@ -91,12 +91,6 @@ export function Dashboard({ onTriggerBreak, onViewHistory }) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <StatusPill status={isLive ? "normal" : "inactive"} label={isLive ? t("status.liveActive") : t("status.idle")} />
-          <button
-            onClick={onTriggerBreak}
-            className="px-4 py-2 rounded-xl border border-warning/40 text-warning bg-warning/10 hover:bg-warning/20 transition text-sm font-medium"
-          >
-            {t("dashboard.simulateBreak")}
-          </button>
         </div>
       </div>
 
