@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @import "./styles/fitwork.css";
 
+/* Dark mode dikendalikan oleh class `.dark` di <html>, BUKAN tema OS.
+   Tanpa class ini, `dark:` default mengikuti prefers-color-scheme (tema OS),
+   sehingga app ikut gelap walau toggle off. */
+@custom-variant dark (&:is(.dark *));
+
 @theme {
   /* FitWork Brand Colors */
   --color-primary:        #0F6E56;

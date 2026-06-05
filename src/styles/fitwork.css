@@ -67,9 +67,5 @@
 .hover\:bg-accent-hover:hover    { background-color: var(--color-accent-hover); }
 .active\:bg-primary-active:active { background-color: var(--color-primary-active); }
 
-/* ── Dark mode ───────────────────────────────────── */
-.dark .dark\:bg-surface-dark    { background-color: var(--color-surface-dark); }
-.dark .dark\:bg-bg-dark         { background-color: var(--color-bg-dark); }
-.dark .dark\:bg-elevation-dark  { background-color: var(--color-elevation-dark); }
-.dark .dark\:text-accent        { color: var(--color-accent); }
-.dark .dark\:text-primary       { color: var(--color-primary); }
+/* Catatan: utility `dark:*` di-generate Tailwind sebagai class-based lewat
+   `@custom-variant dark` di index.css — tidak perlu ditambal manual di sini. */
