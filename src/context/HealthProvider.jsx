@@ -154,7 +154,11 @@ export function HealthProvider({ children }) {
       try {
         const { HubConnectionBuilder } = await import("@microsoft/signalr");
         connection = new HubConnectionBuilder()
-          .withUrl(`${API_BASE}`)
+          // withCredentials:false → negotiate jadi request CORS non-credential,
+          // jadi cukup origin spesifik di Function App → CORS (tanpa perlu
+          // mengaktifkan Access-Control-Allow-Credentials). Azure SignalR pakai
+          // accessToken dari negotiate, bukan cookie.
+          .withUrl(`${API_BASE}`, { withCredentials: false })
           .withAutomaticReconnect()
           .build();
         connection.on("healthUpdate", (payload) => commit(payload));

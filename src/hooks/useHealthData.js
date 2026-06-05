@@ -170,7 +170,9 @@ export function useHealthData(liveVitals = null) {
         // untuk mendapat URL + accessToken Azure SignalR Service, lalu
         // membuka koneksi WebSocket ke service tersebut.
         connection = new HubConnectionBuilder()
-          .withUrl(`${API_BASE}`)
+          // withCredentials:false → negotiate jadi CORS non-credential; cukup
+          // origin spesifik di Function App → CORS. Azure SignalR pakai accessToken.
+          .withUrl(`${API_BASE}`, { withCredentials: false })
           .withAutomaticReconnect()
           .build();
 
