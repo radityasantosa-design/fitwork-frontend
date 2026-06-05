@@ -187,7 +187,9 @@ export function useHealthData(liveVitals = null) {
           try {
             await fetch(`${API_BASE}/messages`, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              // text/plain = "simple request" → hindari preflight CORS (OPTIONS),
+              // yang ditolak Functions host. Body tetap JSON; backend baca via get_json().
+              headers: { "Content-Type": "text/plain" },
               body: vitalsBody(v),
             });
           } catch { /* abaikan; reconnect otomatis */ }
@@ -211,10 +213,10 @@ export function useHealthData(liveVitals = null) {
         const to = setTimeout(() => controller.abort(), 8000);
         const v = vitalsRef.current;
         const res = await fetch(API_URL, {
+          // POST pakai Content-Type text/plain + tanpa header non-safelisted (mis. Accept)
+          // → "simple request" tanpa preflight OPTIONS (yang ditolak Functions host).
           method: v ? "POST" : "GET",
-          headers: v
-            ? { Accept: "application/json", "Content-Type": "application/json" }
-            : { Accept: "application/json" },
+          headers: v ? { "Content-Type": "text/plain" } : { Accept: "application/json" },
           body: vitalsBody(v),
           signal: controller.signal,
         });

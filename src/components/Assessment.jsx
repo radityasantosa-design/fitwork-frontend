@@ -122,9 +122,13 @@ export function Assessment() {
     const payload = { answers: answers.map((a) => a ?? 0), lifeFactors: life };
     try {
       if (!ASSESS_URL) throw new Error(t("assessment.apiNotConfigured"));
+      // Content-Type text/plain agar request tergolong "simple" (tanpa CORS
+      // preflight). Azure Functions host menjawab preflight OPTIONS dari CORS
+      // level-platform-nya — yg tdk memuat origin ini — shg POST application/json
+      // gagal ("Failed to fetch"). Backend tetap mem-parse body via req.get_json().
       const res = await fetch(ASSESS_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "text/plain;charset=UTF-8" },
         body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
