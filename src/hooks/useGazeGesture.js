@@ -13,10 +13,16 @@ import { useCallback, useRef, useState } from "react";
  * dan gesture aktif beserta confidence. Status N/A bila tak terdeteksi.
  */
 
+// @mediapipe/hands "latest" (0.4.1675469240) crash dengan
+// "Module.arguments has been replaced..." saat dimuat berdampingan dengan
+// face_mesh. Pin ke versi stabil terakhir yang bebas bug ini.
+const HANDS_VER = "0.4.1646424915";
+const HANDS_CDN = `https://cdn.jsdelivr.net/npm/@mediapipe/hands@${HANDS_VER}`;
+
 const SCRIPTS = [
   "https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js",
   "https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js",
-  "https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js",
+  `${HANDS_CDN}/hands.js`,
 ];
 
 // Iris & sudut mata (FaceMesh refineLandmarks)
@@ -80,12 +86,29 @@ function classifyGesture(lm) {
   return { name: "Idle", hint: "No clear gesture", conf: 0.3 };
 }
 
+// Builder MediaPipe (dipakai preload & start). Tanpa state → aman di module scope.
+function buildFaceMesh() {
+  const FaceMesh = window.FaceMesh;
+  if (!FaceMesh) return null;
+  const fm = new FaceMesh({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}` });
+  fm.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+  return fm;
+}
+function buildHands() {
+  const Hands = window.Hands;
+  if (!Hands) return null;
+  const hands = new Hands({ locateFile: (f) => `${HANDS_CDN}/${f}` });
+  hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+  return hands;
+}
+
 export function useGazeGesture() {
   const videoRef = useRef(null);
   const faceMeshRef = useRef(null);
   const handsRef = useRef(null);
   const cameraRef = useRef(null);
   const gazeSmooth = useRef({ x: 0.5, y: 0.5 });
+  const preloadedRef = useRef(false);
 
   const [gaze, setGaze] = useState(null);     // {x,y} atau null
   const [gesture, setGesture] = useState(null); // {name,hint,conf} atau null
@@ -122,6 +145,32 @@ export function useGazeGesture() {
     setGesture(classifyGesture(hands[0]));
   }, []);
 
+  /**
+   * Preload: muat skrip + unduh model FaceMesh & Hands + warm-up saat idle,
+   * supaya klik "Start Tracking" langsung jalan tanpa jeda unduh. Handler asli
+   * dipasang di start(); saat warm-up dipakai no-op agar UI tidak ter-update.
+   */
+  const preload = useCallback(async () => {
+    if (preloadedRef.current || (faceMeshRef.current && handsRef.current)) return;
+    try {
+      await loadScripts();
+      const fm = buildFaceMesh();
+      const hands = buildHands();
+      if (!fm || !hands) return;
+      fm.onResults(() => {});
+      hands.onResults(() => {});
+      const warm = document.createElement("canvas");
+      warm.width = 64; warm.height = 64;
+      await fm.send({ image: warm });
+      await hands.send({ image: warm });
+      faceMeshRef.current = fm;
+      handsRef.current = hands;
+      preloadedRef.current = true;
+    } catch (e) {
+      console.warn("[useGazeGesture] preload gagal (akan dimuat saat start):", e?.message);
+    }
+  }, []);
+
   const start = useCallback(async () => {
     try {
       setStatus("loading");
@@ -129,13 +178,12 @@ export function useGazeGesture() {
       const { FaceMesh, Hands, Camera } = window;
       if (!FaceMesh || !Hands || !Camera) throw new Error("MediaPipe gagal dimuat");
 
-      const fm = new FaceMesh({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}` });
-      fm.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+      // Pakai instance hasil preload bila ada (start instan); jika belum, buat.
+      const fm = faceMeshRef.current || buildFaceMesh();
       fm.onResults(onFace);
       faceMeshRef.current = fm;
 
-      const hands = new Hands({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
-      hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+      const hands = handsRef.current || buildHands();
       hands.onResults(onHands);
       handsRef.current = hands;
 
@@ -166,7 +214,7 @@ export function useGazeGesture() {
     setGaze(null); setGesture(null); setStatus("idle");
   }, []);
 
-  return { videoRef, gaze, gesture, fps, status, start, stop };
+  return { videoRef, gaze, gesture, fps, status, start, stop, preload };
 }
 
 export default useGazeGesture;

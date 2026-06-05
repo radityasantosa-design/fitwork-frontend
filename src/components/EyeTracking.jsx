@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { MousePointer, Hand, ArrowDownUp, ZoomIn, Camera as CameraIcon, CameraOff, Loader2, CheckCircle2 } from "lucide-react";
 import { Card, Toggle } from "./shared";
@@ -15,8 +15,23 @@ const gestures = [
 
 export function EyeTracking() {
   const { t } = useT();
-  const { videoRef, gaze, gesture, fps, status, start, stop } = useGazeGesture();
+  const { videoRef, gaze, gesture, fps, status, start, stop, preload } = useGazeGesture();
   const [eye, setEye]         = useState(true);
+
+  // Preload MediaPipe (FaceMesh + Hands) saat halaman dibuka & browser idle,
+  // supaya klik "Start Tracking" langsung jalan tanpa jeda unduh dari CDN.
+  useEffect(() => {
+    let idleId, timeoutId;
+    if (typeof window.requestIdleCallback === "function") {
+      idleId = window.requestIdleCallback(() => preload());
+    } else {
+      timeoutId = setTimeout(() => preload(), 800);
+    }
+    return () => {
+      if (idleId) window.cancelIdleCallback?.(idleId);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [preload]);
   const [gestureOn, setGesture] = useState(true);
   const [auto, setAuto]       = useState(false);
 
