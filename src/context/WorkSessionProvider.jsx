@@ -103,8 +103,23 @@ export function WorkSessionProvider({ children }) {
   const tRef = useRef(t);
   useEffect(() => { tRef.current = t; }, [t]);
 
-  const { vitals, status } = face;
+  const { vitals, status, preload } = face;
   const [active, setActive] = useState(false);
+
+  // Preload MediaPipe (skrip + WASM + model) saat browser idle, supaya klik
+  // "Mulai Kerja" langsung menyalakan kamera tanpa jeda unduh dari CDN.
+  useEffect(() => {
+    let idleId, timeoutId;
+    if (typeof window.requestIdleCallback === "function") {
+      idleId = window.requestIdleCallback(() => preload());
+    } else {
+      timeoutId = setTimeout(() => preload(), 1500);
+    }
+    return () => {
+      if (idleId) window.cancelIdleCallback?.(idleId);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [preload]);
   const [sessionStart, setSessionStart] = useState(null);
   const [awayCount, setAwayCount] = useState(0);
   const [focus, setFocus] = useState({ open: false, reason: null });

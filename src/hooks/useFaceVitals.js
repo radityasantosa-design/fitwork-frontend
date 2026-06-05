@@ -188,6 +188,7 @@ export function useFaceVitals() {
   const faceMeshRef = useRef(null);
   const cameraRef = useRef(null);
   const rafRef = useRef(null);
+  const preloadedRef = useRef(false);
 
   // buffer rPPG & deteksi kedip
   const greenBuf = useRef([]);
@@ -327,25 +328,56 @@ export function useFaceVitals() {
     });
   }, []);
 
+  // Bangun & konfigurasi instance FaceMesh (dipakai preload maupun start).
+  function buildFaceMesh() {
+    const FaceMesh = window.FaceMesh;
+    if (!FaceMesh) return null;
+    const fm = new FaceMesh({
+      locateFile: (file) =>
+        `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
+    });
+    fm.setOptions({
+      maxNumFaces: 1,
+      refineLandmarks: true, // wajib untuk iris/pupil
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5,
+    });
+    return fm;
+  }
+
+  /**
+   * Preload: muat skrip + unduh WASM/model + kompilasi (warm-up) LEBIH AWAL,
+   * saat app idle. Dengan begitu klik "Mulai Kerja" langsung menyalakan kamera
+   * tanpa jeda unduh ~beberapa MB dari CDN. Handler asli (onResults) BARU
+   * dipasang di start(); saat warm-up dipakai no-op agar UI tidak ter-update.
+   */
+  const preload = useCallback(async () => {
+    if (preloadedRef.current || faceMeshRef.current) return;
+    try {
+      await loadFaceMeshScripts();
+      const fm = buildFaceMesh();
+      if (!fm) return;
+      fm.onResults(() => {}); // no-op selama warm-up
+      const warm = document.createElement("canvas");
+      warm.width = 64; warm.height = 64;
+      await fm.send({ image: warm }); // paksa unduh model + kompilasi WASM
+      faceMeshRef.current = fm;
+      preloadedRef.current = true;
+    } catch (e) {
+      console.warn("[useFaceVitals] preload gagal (akan dimuat ulang saat start):", e?.message);
+    }
+  }, []);
+
   const start = useCallback(async () => {
     try {
       setStatus("loading");
       await loadFaceMeshScripts();
-      const FaceMesh = window.FaceMesh;
       const Camera = window.Camera;
-      if (!FaceMesh || !Camera) throw new Error("MediaPipe gagal dimuat");
+      if (!window.FaceMesh || !Camera) throw new Error("MediaPipe gagal dimuat");
 
-      const fm = new FaceMesh({
-        locateFile: (file) =>
-          `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`,
-      });
-      fm.setOptions({
-        maxNumFaces: 1,
-        refineLandmarks: true, // wajib untuk iris/pupil
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5,
-      });
-      fm.onResults(onResults);
+      // Pakai instance hasil preload bila ada (start instan); jika belum, buat.
+      const fm = faceMeshRef.current || buildFaceMesh();
+      fm.onResults(onResults); // pasang/replace handler asli
       faceMeshRef.current = fm;
 
       const video = videoRef.current;
@@ -384,7 +416,7 @@ export function useFaceVitals() {
 
   useEffect(() => () => stop(), [stop]);
 
-  return { videoRef, canvasRef, vitals, status, start, stop };
+  return { videoRef, canvasRef, vitals, status, start, stop, preload };
 }
 
 export default useFaceVitals;
