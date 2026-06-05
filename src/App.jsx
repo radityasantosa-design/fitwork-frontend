@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { LayoutDashboard, HeartPulse, Lightbulb, Eye, ClipboardCheck, Settings as SettingsIcon, Sparkles, Sun, Moon, Menu, X, HelpCircle, LogIn, LogOut, Play, History as HistoryIcon } from "lucide-react";
+import { LayoutDashboard, HeartPulse, Lightbulb, Eye, ClipboardCheck, Settings as SettingsIcon, Sparkles, Menu, X, HelpCircle, LogIn, LogOut, Play, History as HistoryIcon } from "lucide-react";
 import { Logo } from "./components/shared";
 import { Login } from "./components/Login";
 import { Dashboard } from "./components/Dashboard";
@@ -44,20 +44,18 @@ export default function App() {
   const { active: workActive, start: startWork, stop: stopWork, focus, dismissFocus } = useWorkSession();
 
   const [screen, setScreen]                 = useState("dashboard");
-  const [dark, setDark]                     = useState(() => {
-    const saved = localStorage.getItem("fitwork-dark-mode");
-    return saved ? JSON.parse(saved) : false; // default light mode
-  });
   const [breakOpen, setBreakOpen]           = useState(false);
   const [breakKey, setBreakKey]             = useState(0);
   const [mobileNav, setMobileNav]           = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [showLogin, setShowLogin]           = useState(false);
 
+  // Light mode only — dark mode dinonaktifkan sementara (belum siap).
+  // Pastikan class `dark` selalu lepas dan preferensi lama dibersihkan.
   useEffect(() => {
-    document.documentElement.classList.toggle("dark", dark);
-    localStorage.setItem("fitwork-dark-mode", JSON.stringify(dark));
-  }, [dark]);
+    document.documentElement.classList.remove("dark");
+    localStorage.removeItem("fitwork-dark-mode");
+  }, []);
 
   const openBreak = useCallback(() => { setBreakKey((k) => k + 1); setBreakOpen(true); }, []);
 
@@ -167,13 +165,6 @@ export default function App() {
                   <span className="hidden sm:inline">{workActive ? t("work.stop") : t("work.start")}</span>
                 </button>
                 <LanguageSwitcher />
-                <button
-                  onClick={() => setDark(!dark)}
-                  className="w-9 h-9 rounded-lg text-neutral-500 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-white/10 hover:text-neutral-800 dark:hover:text-white flex items-center justify-center transition"
-                  aria-label="Toggle theme"
-                >
-                  {dark ? <Sun size={17} /> : <Moon size={17} />}
-                </button>
                 <NotificationBell />
 
                 {isAuthenticated ? (
