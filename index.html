@@ -15,6 +15,14 @@
     />
   </head>
   <body>
+    <!-- Inisialisasi dark mode sebelum React mount untuk menghindari flash -->
+    <script>
+      try {
+        if (JSON.parse(localStorage.getItem("fitwork-dark-mode"))) {
+          document.documentElement.classList.add("dark");
+        }
+      } catch {}
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

@@ -114,7 +114,9 @@ export function useGazeGesture() {
   const [gesture, setGesture] = useState(null); // {name,hint,conf} atau null
   const [fps, setFps] = useState(0);
   const [status, setStatus] = useState("idle"); // idle|loading|running|denied|error
+  const [sessionStats, setSessionStats] = useState({ totalFrames: 0, faceFrames: 0, handFrames: 0 });
   const frameTimes = useRef([]);
+  const statsRef = useRef({ totalFrames: 0, faceFrames: 0, handFrames: 0 });
 
   const onFace = useCallback((results) => {
     const now = performance.now();
@@ -123,8 +125,13 @@ export function useGazeGesture() {
     const ft = frameTimes.current;
     if (ft.length > 1) setFps(Math.round((ft.length - 1) / ((ft[ft.length - 1] - ft[0]) / 1000)));
 
+    statsRef.current.totalFrames += 1;
+
     const faces = results.multiFaceLandmarks;
     if (!faces || faces.length === 0) { setGaze(null); return; }
+
+    statsRef.current.faceFrames += 1;
+    setSessionStats({ ...statsRef.current });
     const lm = faces[0];
     const gl = eyeGaze(lm, L_IRIS, L_EYE_L, L_EYE_R, L_EYE_T, L_EYE_B);
     const gr = eyeGaze(lm, R_IRIS, R_EYE_L, R_EYE_R, R_EYE_T, R_EYE_B);
@@ -142,6 +149,8 @@ export function useGazeGesture() {
   const onHands = useCallback((results) => {
     const hands = results.multiHandLandmarks;
     if (!hands || hands.length === 0) { setGesture(null); return; }
+    statsRef.current.handFrames += 1;
+    setSessionStats({ ...statsRef.current });
     setGesture(classifyGesture(hands[0]));
   }, []);
 
@@ -211,10 +220,12 @@ export function useGazeGesture() {
       stream?.getTracks?.().forEach((t) => t.stop());
       if (videoRef.current) videoRef.current.srcObject = null;
     } catch {}
+    statsRef.current = { totalFrames: 0, faceFrames: 0, handFrames: 0 };
+    setSessionStats({ totalFrames: 0, faceFrames: 0, handFrames: 0 });
     setGaze(null); setGesture(null); setStatus("idle");
   }, []);
 
-  return { videoRef, gaze, gesture, fps, status, start, stop, preload };
+  return { videoRef, gaze, gesture, fps, status, sessionStats, start, stop, preload };
 }
 
 export default useGazeGesture;

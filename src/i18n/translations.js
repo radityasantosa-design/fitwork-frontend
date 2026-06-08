@@ -217,6 +217,11 @@ export const translations = {
       eyeTracking: "Pelacakan mata",
       gestureRecognition: "Pengenalan gestur",
       autoSensitivity: "Sensitivitas otomatis",
+      overlayHint: "Lihat elemen UI mana saja. Konfirmasi dengan gestur jepit.",
+      sessionStats: "Statistik Sesi",
+      faceDetection: "Deteksi wajah",
+      handDetection: "Deteksi tangan",
+      framesProcessed: "frame diproses",
     },
     assessment: {
       title: "Asesmen Kesehatan Mental",
@@ -630,6 +635,11 @@ export const translations = {
       eyeTracking: "Eye tracking",
       gestureRecognition: "Gesture recognition",
       autoSensitivity: "Auto-sensitivity",
+      overlayHint: "Look at any UI element. Confirm with a pinch gesture.",
+      sessionStats: "Session Stats",
+      faceDetection: "Face detection",
+      handDetection: "Hand detection",
+      framesProcessed: "frames processed",
     },
     assessment: {
       title: "Mental Health Assessment",
