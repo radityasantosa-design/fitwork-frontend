@@ -1,6 +1,5 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, createElement } from "react";
 import { createPortal } from "react-dom";
-import { createElement, useState } from "react";
 
 /**
  * useGazeOverlay
@@ -31,22 +30,17 @@ export function useGazeOverlay(gaze, gesture, running) {
   // Eksekusi klik pada elemen di bawah titik gaze
   const fireClick = useCallback((px, py) => {
     const now = Date.now();
-    if (now - lastClickTime.current < 1200) return; // debounce 1.2 detik
+    if (now - lastClickTime.current < 800) return; // debounce 0.8 detik
     lastClickTime.current = now;
 
-    // Sembunyikan overlay sementara agar elementFromPoint tidak mendeteksinya
-    const overlay = document.getElementById("fitwork-gaze-overlay");
-    if (overlay) overlay.style.pointerEvents = "none";
-
+    // Overlay sudah pointer-events:none, jadi elementFromPoint mengabaikannya.
     const el = document.elementFromPoint(px, py);
+    if (!el || el === document.body || el === document.documentElement) return;
 
-    if (overlay) overlay.style.pointerEvents = "none";
-
-    if (el && el !== document.body && el !== document.documentElement) {
-      // Fokus dulu untuk elemen input/button, lalu klik
-      try { el.focus(); } catch {}
-      try { el.click(); } catch {}
-    }
+    // Naik ke ancestor interaktif terdekat (button/a/input/[role=button]).
+    const target = el.closest("button, a, input, select, textarea, [role='button'], [onclick]") || el;
+    try { target.focus?.(); } catch { /* elemen tak fokusabel */ }
+    try { target.click?.(); } catch { /* elemen tak klikabel */ }
   }, []);
 
   // Eksekusi scroll berdasarkan posisi vertikal tatapan

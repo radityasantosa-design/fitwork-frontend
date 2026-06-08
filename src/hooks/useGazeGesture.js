@@ -62,6 +62,19 @@ function eyeGaze(lm, iris, L, R, T, B) {
   return { x, y };
 }
 
+/**
+ * Amplifikasi gerakan iris. Iris hanya bergeser dalam rentang sempit
+ * (~0.35–0.65 di sumbu X, lebih sempit di Y), jadi gerakan kecil
+ * di-perbesar dari titik tengah agar bisa menjangkau seluruh layar.
+ */
+const GAIN_X = 3.2;   // amplifikasi horizontal
+const GAIN_Y = 4.0;   // vertikal lebih sempit → gain lebih besar
+const CENTER = 0.5;   // titik netral (lihat ke tengah)
+
+function amplify(v, gain) {
+  return Math.max(0, Math.min(1, CENTER + (v - CENTER) * gain));
+}
+
 /** Apakah satu jari "terangkat" (tip lebih tinggi/jauh dari sendi PIP). */
 function fingerUp(lm, tip, pip) {
   return lm[tip].y < lm[pip].y; // koordinat y kecil = lebih atas
@@ -79,10 +92,11 @@ function classifyGesture(lm) {
   const pinky = fingerUp(lm, PINKY_TIP, PINKY_PIP);
   const upCount = [idx, mid, ring, pinky].filter(Boolean).length;
 
-  if (pinch < 0.35) return { name: "Click", hint: "Pinch detected", conf: Math.min(1, (0.35 - pinch) / 0.35 + 0.3) };
-  if (idx && mid && !ring && !pinky) return { name: "Scroll", hint: "Two fingers up", conf: 0.8 };
+  // Pinch lebih longgar (0.45) supaya klik lebih mudah dipicu.
+  if (pinch < 0.45) return { name: "Click", hint: "Pinch detected", conf: Math.min(1, (0.45 - pinch) / 0.45 + 0.4) };
+  if (idx && mid && !ring && !pinky) return { name: "Scroll", hint: "Two fingers up", conf: 0.85 };
   if (upCount >= 4 && spread > 0.9) return { name: "Zoom", hint: "Spread fingers", conf: 0.75 };
-  if (upCount >= 4) return { name: "Cursor Move", hint: "Open palm", conf: 0.7 };
+  if (upCount >= 3) return { name: "Cursor Move", hint: "Open palm", conf: 0.7 };
   return { name: "Idle", hint: "No clear gesture", conf: 0.3 };
 }
 
@@ -117,6 +131,15 @@ export function useGazeGesture() {
   const [sessionStats, setSessionStats] = useState({ totalFrames: 0, faceFrames: 0, handFrames: 0 });
   const frameTimes = useRef([]);
   const statsRef = useRef({ totalFrames: 0, faceFrames: 0, handFrames: 0 });
+  const lastStatsPush = useRef(0);
+
+  // Throttle update sessionStats → hindari re-render tiap frame (≈30fps).
+  const pushStats = () => {
+    const now = performance.now();
+    if (now - lastStatsPush.current < 500) return;
+    lastStatsPush.current = now;
+    setSessionStats({ ...statsRef.current });
+  };
 
   const onFace = useCallback((results) => {
     const now = performance.now();
@@ -131,26 +154,32 @@ export function useGazeGesture() {
     if (!faces || faces.length === 0) { setGaze(null); return; }
 
     statsRef.current.faceFrames += 1;
-    setSessionStats({ ...statsRef.current });
+    pushStats();
     const lm = faces[0];
     const gl = eyeGaze(lm, L_IRIS, L_EYE_L, L_EYE_R, L_EYE_T, L_EYE_B);
     const gr = eyeGaze(lm, R_IRIS, R_EYE_L, R_EYE_R, R_EYE_T, R_EYE_B);
     // rata-rata kedua mata; mirror x agar sesuai tampilan kamera ter-mirror
     let x = 1 - (gl.x + gr.x) / 2;
     let y = (gl.y + gr.y) / 2;
-    x = Math.max(0, Math.min(1, x));
-    y = Math.max(0, Math.min(1, y));
-    // smoothing
-    gazeSmooth.current.x = gazeSmooth.current.x * 0.7 + x * 0.3;
-    gazeSmooth.current.y = gazeSmooth.current.y * 0.7 + y * 0.3;
-    setGaze({ x: Number(gazeSmooth.current.x.toFixed(3)), y: Number(gazeSmooth.current.y.toFixed(3)) });
+    // amplifikasi dari titik tengah → gerakan iris kecil menjangkau seluruh layar
+    x = amplify(x, GAIN_X);
+    y = amplify(y, GAIN_Y);
+
+    // Smoothing adaptif: gerakan besar → responsif (alpha tinggi),
+    // gerakan kecil/diam → stabil (alpha rendah, kurangi jitter).
+    const prev = gazeSmooth.current;
+    const delta = Math.hypot(x - prev.x, y - prev.y);
+    const alpha = delta > 0.08 ? 0.45 : 0.18; // dead-zone halus saat diam
+    prev.x = prev.x * (1 - alpha) + x * alpha;
+    prev.y = prev.y * (1 - alpha) + y * alpha;
+    setGaze({ x: Number(prev.x.toFixed(3)), y: Number(prev.y.toFixed(3)) });
   }, []);
 
   const onHands = useCallback((results) => {
     const hands = results.multiHandLandmarks;
     if (!hands || hands.length === 0) { setGesture(null); return; }
     statsRef.current.handFrames += 1;
-    setSessionStats({ ...statsRef.current });
+    pushStats();
     setGesture(classifyGesture(hands[0]));
   }, []);
 

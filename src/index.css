@@ -16,11 +16,14 @@
   --color-bg-dark:        #1A1F1E;
 
   /* Surface & interaction tokens */
+  --color-surface-light:  #f5f7f6;
   --color-surface-dark:   #222826;
   --color-primary-hover:  #0d5d49;
   --color-primary-active: #0a4a3a;
+  --color-primary-light:  #e8f1ed;
   --color-elevation-dark: #2a3230;
   --color-accent-hover:   #179066;
+  --color-accent-light:   #e8f9f4;
 
   /* Typography */
   --font-display: "Sora", system-ui, sans-serif;
