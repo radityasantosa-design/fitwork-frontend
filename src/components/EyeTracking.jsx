@@ -224,8 +224,7 @@ export function EyeTracking() {
                   ) : (
                     <button
                       onClick={() => setShowCalib(true)}
-                      disabled={!faceDetected}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-accent hover:bg-accent/90 text-white text-sm font-semibold active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-accent hover:bg-accent/90 text-white text-sm font-semibold active:scale-95 transition"
                     >
                       <Crosshair size={15} /> {t("eye.startCalib")}
                     </button>

@@ -244,12 +244,16 @@ export function useGazeGesture() {
       handsRef.current = hands;
 
       const video = videoRef.current;
+      // FaceMesh tiap frame (prioritas gaze/kalibrasi); Hands selang-seling
+      // (gesture tak perlu 30fps) supaya CPU tidak kewalahan & fps tidak drop.
+      let frameNo = 0;
       const cam = new Camera(video, {
         onFrame: async () => {
+          frameNo += 1;
           if (faceMeshRef.current) await faceMeshRef.current.send({ image: video });
-          if (handsRef.current) await handsRef.current.send({ image: video });
+          if (handsRef.current && frameNo % 2 === 0) await handsRef.current.send({ image: video });
         },
-        width: 640, height: 480,
+        width: 480, height: 360, // resolusi lebih kecil → lebih cepat di CPU lemah
       });
       cameraRef.current = cam;
       await cam.start();
