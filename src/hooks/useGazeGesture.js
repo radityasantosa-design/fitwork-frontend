@@ -63,16 +63,17 @@ function eyeGaze(lm, iris, L, R, T, B) {
 }
 
 /**
- * Amplifikasi gerakan iris. Iris hanya bergeser dalam rentang sempit
- * (~0.35–0.65 di sumbu X, lebih sempit di Y), jadi gerakan kecil
- * di-perbesar dari titik tengah agar bisa menjangkau seluruh layar.
+ * Map nilai iris mentah ke [0..1] layar memakai rentang hasil kalibrasi.
+ * cal = { min, max } per sumbu (nilai iris saat user menatap tepi layar).
+ * Bila belum dikalibrasi, fallback ke amplifikasi tetap dari titik tengah.
  */
-const GAIN_X = 3.2;   // amplifikasi horizontal
-const GAIN_Y = 4.0;   // vertikal lebih sempit → gain lebih besar
-const CENTER = 0.5;   // titik netral (lihat ke tengah)
+const FALLBACK_GAIN = 3.2;
 
-function amplify(v, gain) {
-  return Math.max(0, Math.min(1, CENTER + (v - CENTER) * gain));
+function mapWithCal(v, cal) {
+  if (cal && cal.max - cal.min > 0.02) {
+    return Math.max(0, Math.min(1, (v - cal.min) / (cal.max - cal.min)));
+  }
+  return Math.max(0, Math.min(1, 0.5 + (v - 0.5) * FALLBACK_GAIN));
 }
 
 /** Apakah satu jari "terangkat" (tip lebih tinggi/jauh dari sendi PIP). */
@@ -124,7 +125,7 @@ export function useGazeGesture() {
   const gazeSmooth = useRef({ x: 0.5, y: 0.5 });
   const preloadedRef = useRef(false);
 
-  const [gaze, setGaze] = useState(null);     // {x,y} atau null
+  const [gaze, setGaze] = useState(null);     // {x,y} ternormalisasi layar [0..1] atau null
   const [gesture, setGesture] = useState(null); // {name,hint,conf} atau null
   const [fps, setFps] = useState(0);
   const [status, setStatus] = useState("idle"); // idle|loading|running|denied|error
@@ -132,6 +133,13 @@ export function useGazeGesture() {
   const frameTimes = useRef([]);
   const statsRef = useRef({ totalFrames: 0, faceFrames: 0, handFrames: 0 });
   const lastStatsPush = useRef(0);
+
+  // Nilai iris MENTAH terbaru (sebelum mapping) — dibaca oleh proses kalibrasi.
+  const rawGazeRef = useRef({ x: 0.5, y: 0.5 });
+  // Rentang kalibrasi { x:{min,max}, y:{min,max} }. Null = belum dikalibrasi.
+  const calibrationRef = useRef(null);
+  const setCalibration = useCallback((cal) => { calibrationRef.current = cal; }, []);
+  const getRawGaze = useCallback(() => ({ ...rawGazeRef.current }), []);
 
   // Throttle update sessionStats → hindari re-render tiap frame (≈30fps).
   const pushStats = () => {
@@ -159,11 +167,14 @@ export function useGazeGesture() {
     const gl = eyeGaze(lm, L_IRIS, L_EYE_L, L_EYE_R, L_EYE_T, L_EYE_B);
     const gr = eyeGaze(lm, R_IRIS, R_EYE_L, R_EYE_R, R_EYE_T, R_EYE_B);
     // rata-rata kedua mata; mirror x agar sesuai tampilan kamera ter-mirror
-    let x = 1 - (gl.x + gr.x) / 2;
-    let y = (gl.y + gr.y) / 2;
-    // amplifikasi dari titik tengah → gerakan iris kecil menjangkau seluruh layar
-    x = amplify(x, GAIN_X);
-    y = amplify(y, GAIN_Y);
+    const rawX = 1 - (gl.x + gr.x) / 2;
+    const rawY = (gl.y + gr.y) / 2;
+    rawGazeRef.current = { x: rawX, y: rawY }; // simpan mentah untuk kalibrasi
+
+    // map ke layar pakai rentang kalibrasi (atau fallback amplifikasi)
+    const cal = calibrationRef.current;
+    let x = mapWithCal(rawX, cal?.x);
+    let y = mapWithCal(rawY, cal?.y);
 
     // Smoothing adaptif: gerakan besar → responsif (alpha tinggi),
     // gerakan kecil/diam → stabil (alpha rendah, kurangi jitter).
@@ -254,7 +265,7 @@ export function useGazeGesture() {
     setGaze(null); setGesture(null); setStatus("idle");
   }, []);
 
-  return { videoRef, gaze, gesture, fps, status, sessionStats, start, stop, preload };
+  return { videoRef, gaze, gesture, fps, status, sessionStats, start, stop, preload, getRawGaze, setCalibration };
 }
 
 export default useGazeGesture;

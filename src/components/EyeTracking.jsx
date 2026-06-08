@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion } from "motion/react";
-import { MousePointer, Hand, ArrowDownUp, ZoomIn, Camera as CameraIcon, CameraOff, Loader2, CheckCircle2 } from "lucide-react";
+import { MousePointer, Hand, ArrowDownUp, ZoomIn, Camera as CameraIcon, CameraOff, Loader2, CheckCircle2, Crosshair, AlertCircle } from "lucide-react";
 import { Card, Toggle } from "./shared";
 import { useGazeGesture } from "../hooks/useGazeGesture";
 import { useGazeOverlay, GazeOverlayPortal } from "../hooks/useGazeOverlay";
+import { CalibrationOverlay } from "./CalibrationOverlay";
 import { useT } from "../i18n/LanguageProvider";
 
 const gestures = [
@@ -15,10 +16,12 @@ const gestures = [
 
 export function EyeTracking() {
   const { t } = useT();
-  const { videoRef, gaze, gesture, fps, status, sessionStats, start, stop, preload } = useGazeGesture();
+  const { videoRef, gaze, gesture, fps, status, sessionStats, start, stop, preload, getRawGaze, setCalibration } = useGazeGesture();
   const [eye, setEye]         = useState(true);
   const [gestureOn, setGestureOn] = useState(true);
   const [auto, setAuto]       = useState(false);
+  const [calibrated, setCalibrated] = useState(false);
+  const [showCalib, setShowCalib] = useState(false);
 
   useEffect(() => {
     let idleId, timeoutId;
@@ -33,14 +36,24 @@ export function EyeTracking() {
     };
   }, [preload]);
 
+  // Hentikan kamera saat keluar dari page → overlay tatapan TIDAK ikut ke page lain.
+  useEffect(() => () => stop(), [stop]);
+
   const running = status === "running";
   const active = running || status === "loading";
   const activeGestureName = gesture?.name && gesture.name !== "Idle" ? gesture.name : null;
 
-  // Overlay tatapan di atas seluruh halaman
-  const effectiveGaze = eye ? gaze : null;
-  const effectiveGesture = gestureOn ? gesture : null;
-  const { dotPos } = useGazeOverlay(effectiveGaze, effectiveGesture, running);
+  // Overlay tatapan: hanya saat tracking aktif & sudah dikalibrasi.
+  const overlayReady = running && calibrated;
+  const effectiveGaze = eye && overlayReady ? gaze : null;
+  const effectiveGesture = gestureOn && overlayReady ? gesture : null;
+  const { dotPos } = useGazeOverlay(effectiveGaze, effectiveGesture, overlayReady);
+
+  const handleCalibComplete = useCallback((cal) => {
+    setCalibration(cal);
+    setCalibrated(true);
+    setShowCalib(false);
+  }, [setCalibration]);
 
   const faceRate = sessionStats.totalFrames > 0
     ? Math.round((sessionStats.faceFrames / sessionStats.totalFrames) * 100)
@@ -49,10 +62,25 @@ export function EyeTracking() {
     ? Math.round((sessionStats.handFrames / sessionStats.totalFrames) * 100)
     : null;
 
+  const subtitle = !running
+    ? t("eye.sub", { state: t("eye.cameraOff") })
+    : !calibrated
+      ? t("eye.needCalib")
+      : t("eye.overlayHint");
+
   return (
     <>
-      {/* Dot tatapan di atas seluruh halaman */}
+      {/* Dot tatapan di atas seluruh halaman (aktif hanya saat tracking + kalibrasi) */}
       <GazeOverlayPortal dotPos={dotPos} gestureName={activeGestureName} />
+
+      {/* Overlay kalibrasi 5-titik */}
+      {showCalib && running && (
+        <CalibrationOverlay
+          getRawGaze={getRawGaze}
+          onComplete={handleCalibComplete}
+          onCancel={() => setShowCalib(false)}
+        />
+      )}
 
       <div className="p-4 sm:p-6 lg:p-8 space-y-5 lg:space-y-6">
         <div>
@@ -60,9 +88,7 @@ export function EyeTracking() {
             {t("eye.title")}
           </h1>
           <p className="text-neutral-500 dark:text-neutral-400 mt-1" style={{ fontSize: 14 }}>
-            {running
-              ? t("eye.overlayHint")
-              : t("eye.sub", { state: t("eye.cameraOff") })}
+            {subtitle}
           </p>
         </div>
 
@@ -181,6 +207,34 @@ export function EyeTracking() {
                   {gesture ? `${t("eye.handDetected")}: ${gesture.name} (${Math.round(gesture.conf * 100)}%)` : t("eye.noHand")}
                 </div>
               </div>
+
+              {/* Kalibrasi — wajib sebelum overlay aktif */}
+              {running && (
+                <div className="mt-3">
+                  {calibrated ? (
+                    <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-accent/8 border border-accent/25">
+                      <span className="flex items-center gap-2 text-accent text-xs font-semibold">
+                        <CheckCircle2 size={14} /> {t("eye.calibrated")}
+                      </span>
+                      <button onClick={() => setShowCalib(true)} className="text-neutral-500 dark:text-neutral-400 hover:text-accent text-xs underline">
+                        {t("eye.recalibrate")}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowCalib(true)}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-accent hover:bg-accent/90 text-white text-sm font-semibold active:scale-95 transition"
+                    >
+                      <Crosshair size={15} /> {t("eye.startCalib")}
+                    </button>
+                  )}
+                  {!calibrated && (
+                    <p className="mt-2 flex items-start gap-1.5 text-warning text-xs">
+                      <AlertCircle size={13} className="shrink-0 mt-0.5" /> {t("eye.calibRequired")}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Session stats — data nyata dari MediaPipe */}
