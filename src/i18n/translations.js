@@ -52,6 +52,7 @@ export const translations = {
       inFlow: " — kamu sedang dalam flow.",
       bringBack: " — ayo naikkan lagi.",
       idleSub: "Belum ada sesi berjalan. Nyalakan kamera di Monitor Kesehatan untuk mulai.",
+      smartControl: "Kontrol Cerdas",
       simulateBreak: "Simulasi alarm istirahat",
       breakRecommended: "Istirahat disarankan",
       breakTime: "Saatnya istirahat singkat",
@@ -231,6 +232,8 @@ export const translations = {
       calibGetReady: "Bersiap… arahkan mata ke titik.",
       calibLook: "Tatap titik ini, jangan gerakkan kepala.",
       calibCancel: "Batalkan",
+      calibFaceLost: "Wajah tidak terdeteksi — hadapkan wajah ke kamera",
+      calibNoFace: "Hadapkan wajah ke kamera agar bisa kalibrasi.",
     },
     assessment: {
       title: "Asesmen Kesehatan Mental",
@@ -479,6 +482,7 @@ export const translations = {
       inFlow: " — you're in flow state.",
       bringBack: " — let's bring it back up.",
       idleSub: "No active session yet. Start the camera in Health Monitor to begin.",
+      smartControl: "Smart Control",
       simulateBreak: "Simulate break alert",
       breakRecommended: "Break recommended",
       breakTime: "Time for a short break",
@@ -658,6 +662,8 @@ export const translations = {
       calibGetReady: "Get ready… aim your eyes at the dot.",
       calibLook: "Look at this dot, keep your head still.",
       calibCancel: "Cancel",
+      calibFaceLost: "No face detected — face the camera",
+      calibNoFace: "Face the camera to calibrate.",
     },
     assessment: {
       title: "Mental Health Assessment",

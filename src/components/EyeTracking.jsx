@@ -41,6 +41,7 @@ export function EyeTracking() {
 
   const running = status === "running";
   const active = running || status === "loading";
+  const faceDetected = running && gaze != null; // gaze non-null = wajah terdeteksi
   const activeGestureName = gesture?.name && gesture.name !== "Idle" ? gesture.name : null;
 
   // Overlay tatapan: hanya saat tracking aktif & sudah dikalibrasi.
@@ -223,14 +224,16 @@ export function EyeTracking() {
                   ) : (
                     <button
                       onClick={() => setShowCalib(true)}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-accent hover:bg-accent/90 text-white text-sm font-semibold active:scale-95 transition"
+                      disabled={!faceDetected}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-accent hover:bg-accent/90 text-white text-sm font-semibold active:scale-95 transition disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <Crosshair size={15} /> {t("eye.startCalib")}
                     </button>
                   )}
                   {!calibrated && (
                     <p className="mt-2 flex items-start gap-1.5 text-warning text-xs">
-                      <AlertCircle size={13} className="shrink-0 mt-0.5" /> {t("eye.calibRequired")}
+                      <AlertCircle size={13} className="shrink-0 mt-0.5" />
+                      {faceDetected ? t("eye.calibRequired") : t("eye.calibNoFace")}
                     </p>
                   )}
                 </div>

@@ -106,7 +106,8 @@ function buildFaceMesh() {
   const FaceMesh = window.FaceMesh;
   if (!FaceMesh) return null;
   const fm = new FaceMesh({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${f}` });
-  fm.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+  // Confidence diturunkan (0.3) agar wajah lebih mudah terdeteksi di cahaya kurang.
+  fm.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.3, minTrackingConfidence: 0.3 });
   return fm;
 }
 function buildHands() {
@@ -135,11 +136,17 @@ export function useGazeGesture() {
   const lastStatsPush = useRef(0);
 
   // Nilai iris MENTAH terbaru (sebelum mapping) — dibaca oleh proses kalibrasi.
-  const rawGazeRef = useRef({ x: 0.5, y: 0.5 });
+  // `t` = timestamp frame agar konsumen bisa tahu data masih fresh (wajah ada).
+  const rawGazeRef = useRef({ x: 0.5, y: 0.5, t: 0 });
   // Rentang kalibrasi { x:{min,max}, y:{min,max} }. Null = belum dikalibrasi.
   const calibrationRef = useRef(null);
   const setCalibration = useCallback((cal) => { calibrationRef.current = cal; }, []);
-  const getRawGaze = useCallback(() => ({ ...rawGazeRef.current }), []);
+  // Kembalikan raw gaze HANYA bila fresh (≤300ms) → null bila wajah tak terdeteksi.
+  const getRawGaze = useCallback(() => {
+    const r = rawGazeRef.current;
+    if (performance.now() - r.t > 300) return null;
+    return { x: r.x, y: r.y };
+  }, []);
 
   // Throttle update sessionStats → hindari re-render tiap frame (≈30fps).
   const pushStats = () => {
@@ -169,7 +176,7 @@ export function useGazeGesture() {
     // rata-rata kedua mata; mirror x agar sesuai tampilan kamera ter-mirror
     const rawX = 1 - (gl.x + gr.x) / 2;
     const rawY = (gl.y + gr.y) / 2;
-    rawGazeRef.current = { x: rawX, y: rawY }; // simpan mentah untuk kalibrasi
+    rawGazeRef.current = { x: rawX, y: rawY, t: now }; // simpan mentah + waktu untuk kalibrasi
 
     // map ke layar pakai rentang kalibrasi (atau fallback amplifikasi)
     const cal = calibrationRef.current;

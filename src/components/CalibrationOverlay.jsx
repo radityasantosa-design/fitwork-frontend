@@ -17,7 +17,6 @@ import { useT } from "../i18n/LanguageProvider";
  * @param {() => void} onCancel     - batalkan kalibrasi
  */
 
-const SAMPLE_MS = 1500;   // durasi menatap tiap titik
 const SETTLE_MS = 600;    // jeda agar mata pindah dulu sebelum sampling
 const POINTS = [
   { x: 0.5,  y: 0.5  },   // tengah dulu (netral)
@@ -27,30 +26,38 @@ const POINTS = [
   { x: 0.08, y: 0.92 },   // kiri-bawah
 ];
 
+// Butuh sekian sampel VALID (wajah terdeteksi) agar satu titik dianggap selesai.
+const NEEDED_SAMPLES = 45; // ≈1.5 dtk @30fps bila wajah stabil
+
 export function CalibrationOverlay({ getRawGaze, onComplete, onCancel }) {
   const { t } = useT();
   const [idx, setIdx] = useState(0);
   const [phase, setPhase] = useState("settle"); // settle | sampling
   const [progress, setProgress] = useState(0);
+  const [faceLost, setFaceLost] = useState(false);
   const samplesRef = useRef([]); // [{ point:{x,y}, raw:{x,y} }]
 
   useEffect(() => {
-    let raf, startTime;
+    let raf;
     const point = POINTS[idx];
     const collected = [];
 
     // Fase "settle": beri jeda agar mata pindah ke titik baru sebelum sampling.
     const settleTimer = setTimeout(() => {
       setPhase("sampling");
-      startTime = performance.now();
 
       const tick = () => {
-        const elapsed = performance.now() - startTime;
-        setProgress(Math.min(1, elapsed / SAMPLE_MS));
         const raw = getRawGaze();
-        if (raw) collected.push(raw);
+        if (raw) {
+          collected.push(raw);
+          setFaceLost(false);
+        } else {
+          // Wajah hilang → progress berhenti maju sampai wajah kembali.
+          setFaceLost(true);
+        }
+        setProgress(Math.min(1, collected.length / NEEDED_SAMPLES));
 
-        if (elapsed < SAMPLE_MS) {
+        if (collected.length < NEEDED_SAMPLES) {
           raf = requestAnimationFrame(tick);
         } else {
           // median tiap sumbu → tahan outlier
@@ -104,6 +111,11 @@ export function CalibrationOverlay({ getRawGaze, onComplete, onCancel }) {
         <p className="text-accent text-xs mt-3 font-mono">
           {idx + 1} / {POINTS.length}
         </p>
+        {faceLost && phase === "sampling" && (
+          <p className="mt-3 inline-block px-3 py-1.5 rounded-lg bg-warning/90 text-white text-xs font-medium">
+            {t("eye.calibFaceLost")}
+          </p>
+        )}
       </div>
 
       {/* Target titik */}

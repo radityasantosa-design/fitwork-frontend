@@ -259,7 +259,7 @@ export default function App() {
 
           {/* Page content */}
           <main className="flex-1">
-            {screen === "dashboard"       && <Dashboard onTriggerBreak={openBreak} onViewHistory={() => setScreen("history")} />}
+            {screen === "dashboard"       && <Dashboard onTriggerBreak={openBreak} onViewHistory={() => setScreen("history")} onOpenEyeControl={() => setScreen("eye")} />}
             {screen === "health"          && <HealthMonitoring />}
             {screen === "history"         && <History />}
             {screen === "assessment"      && <Assessment />}

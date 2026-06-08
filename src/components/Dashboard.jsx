@@ -1,4 +1,4 @@
-import { Activity, Brain, Clock, Coffee, Sparkles, Lightbulb, TrendingUp, AlertTriangle, WifiOff, ChevronRight } from "lucide-react";
+import { Activity, Brain, Clock, Coffee, Sparkles, Lightbulb, TrendingUp, AlertTriangle, WifiOff, ChevronRight, Eye } from "lucide-react";
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { Card, MetricCard, GaugeRing, StatusPill } from "./shared";
 import { useHealth } from "../context/HealthProvider";
@@ -11,7 +11,7 @@ function fatigueStatus(v) { return v == null ? "inactive" : v > 60 ? "alert" : v
 function focusStatus(v) { return v == null ? "inactive" : v >= 70 ? "normal" : v >= 50 ? "warning" : "alert"; }
 const r = (v) => (v == null ? "--" : Math.round(v));
 
-export function Dashboard({ onTriggerBreak, onViewHistory }) {
+export function Dashboard({ onTriggerBreak, onViewHistory, onOpenEyeControl }) {
   const { t, lang } = useT();
   const { profile, isAuthenticated } = useAuth();
   const { data, history, isLive } = useHealth();
@@ -96,6 +96,12 @@ export function Dashboard({ onTriggerBreak, onViewHistory }) {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={onOpenEyeControl}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-accent hover:bg-accent/90 text-white text-sm font-semibold active:scale-95 transition shrink-0"
+          >
+            <Eye size={16} /> {t("dashboard.smartControl")}
+          </button>
           <StatusPill status={isLive ? "normal" : "inactive"} label={isLive ? t("status.liveActive") : t("status.idle")} />
         </div>
       </div>
