@@ -17,6 +17,7 @@ import { NotificationBell } from "./components/NotificationBell";
 import { useT, LanguageSwitcher } from "./i18n/LanguageProvider";
 import { useAuth } from "./context/AuthContext";
 import { useWorkSession } from "./context/WorkSessionProvider";
+import { useGazeControl } from "./context/GazeControlProvider";
 
 const nav = [
   { id: "dashboard",       icon: LayoutDashboard },
@@ -42,6 +43,7 @@ export default function App() {
   const { t } = useT();
   const { isAuthenticated, isConfigured, loading, profile, signOut } = useAuth();
   const { active: workActive, start: startWork, stop: stopWork, focus, dismissFocus } = useWorkSession();
+  const { running: gazeRunning, calibrated: gazeCalibrated, disable: disableGaze } = useGazeControl();
 
   const [screen, setScreen]                 = useState("dashboard");
   const [dark, setDark]                     = useState(() => {
@@ -174,6 +176,15 @@ export default function App() {
                 >
                   {dark ? <Sun size={17} /> : <Moon size={17} />}
                 </button>
+                {gazeRunning && gazeCalibrated && (
+                  <button
+                    onClick={disableGaze}
+                    className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-accent/15 text-primary dark:text-accent hover:bg-accent/25 transition text-xs font-semibold"
+                    title={t("eye.disableControl")}
+                  >
+                    <Eye size={13} className="animate-pulse" /> {t("eye.controlOn")}
+                  </button>
+                )}
                 <NotificationBell />
 
                 {isAuthenticated ? (

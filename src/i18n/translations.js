@@ -234,6 +234,9 @@ export const translations = {
       calibCancel: "Batalkan",
       calibFaceLost: "Wajah tidak terdeteksi — hadapkan wajah ke kamera",
       calibNoFace: "Hadapkan wajah ke kamera agar bisa kalibrasi.",
+      globalActive: "Kontrol aktif di semua halaman — lirik & gestur bekerja di mana saja.",
+      controlOn: "Kontrol aktif",
+      disableControl: "Matikan kontrol cerdas",
     },
     assessment: {
       title: "Asesmen Kesehatan Mental",
@@ -664,6 +667,9 @@ export const translations = {
       calibCancel: "Cancel",
       calibFaceLost: "No face detected — face the camera",
       calibNoFace: "Face the camera to calibrate.",
+      globalActive: "Control active on every page — gaze & gestures work anywhere.",
+      controlOn: "Control on",
+      disableControl: "Turn off smart control",
     },
     assessment: {
       title: "Mental Health Assessment",
